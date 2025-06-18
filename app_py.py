@@ -17,7 +17,7 @@ df = pd.read_csv(url)
 target_encoder = LabelEncoder()
 df['Personality'] = target_encoder.fit_transform(df['Personality'])
 
-# Inisialisasi session state
+# Session state init
 if 'model' not in st.session_state:
     st.session_state.model = None
 if 'X_columns' not in st.session_state:
@@ -27,13 +27,18 @@ if 'X_test' not in st.session_state:
 if 'y_test' not in st.session_state:
     st.session_state.y_test = None
 
-# Sidebar navigasi
-st.sidebar.title("Navigasi")
-page_options = ["Informasi", "Pemodelan Data", "Prediksi", "Anggota Kelompok"]
-page = st.sidebar.selectbox("Navigasi", page_options)
+# Sidebar Navigasi
+with st.sidebar.expander("📁 Navigasi Aplikasi", expanded=True):
+    page = st.radio("Pilih Halaman:", [
+        "📘 Informasi Dataset",
+        "📈 Visualisasi Data",
+        "📊 Pemodelan Data",
+        "🔮 Prediksi",
+        "👥 Anggota Kelompok"
+    ])
 
-# -------------------- Halaman Informasi --------------------
-if page == "Informasi":
+# -------------------- Informasi Dataset --------------------
+if page == "📘 Informasi Dataset":
     st.title("📘 Informasi Dataset")
     st.write("Dataset ini berisi data kepribadian berdasarkan berbagai aspek.")
 
@@ -43,36 +48,47 @@ if page == "Informasi":
     st.subheader("📊 Deskripsi Kolom")
     st.write(df.describe(include='all'))
 
-    st.subheader("🧠 Distribusi Target (Personality Type)")
-    fig_dist, ax_dist = plt.subplots()
-    sns.countplot(data=df, x='Personality', ax=ax_dist)
-    ax_dist.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
-    st.pyplot(fig_dist)
+# -------------------- Visualisasi Data --------------------
+elif page == "📈 Visualisasi Data":
+    st.title("📈 Visualisasi Data")
 
-    st.subheader("📉 Korelasi antar Fitur")
-    fig_corr, ax_corr = plt.subplots()
+    st.subheader("Distribusi Personality")
+    fig1, ax1 = plt.subplots()
+    sns.countplot(data=df, x='Personality', ax=ax1)
+    ax1.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
+    st.pyplot(fig1)
+
+    st.subheader("📉 Korelasi Fitur Numerik")
     corr = df.corr(numeric_only=True)
-    sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax_corr)
-    st.pyplot(fig_corr)
+    fig2, ax2 = plt.subplots()
+    sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax2)
+    st.pyplot(fig2)
 
-    st.subheader("📦 Boxplot Setiap Fitur Numerik")
-    for col in df.select_dtypes(include=['int64', 'float64']).columns:
-        if col != 'Personality':
-            fig, ax = plt.subplots()
-            sns.boxplot(data=df, x='Personality', y=col, ax=ax)
-            ax.set_title(f"Distribusi {col} berdasarkan Personality")
-            ax.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
-            st.pyplot(fig)
+    st.subheader("📦 Boxplot Fitur Numerik berdasarkan Personality")
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    if 'Personality' in numeric_cols:
+        numeric_cols.remove('Personality')
 
-# -------------------- Halaman Pemodelan --------------------
-elif page == "Pemodelan Data":
+    selected_col = st.selectbox("Pilih fitur untuk boxplot:", numeric_cols)
+    fig3, ax3 = plt.subplots()
+    sns.boxplot(data=df, x='Personality', y=selected_col, ax=ax3)
+    ax3.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
+    st.pyplot(fig3)
+
+    st.subheader("🔗 Pairplot (opsional)")
+    if st.checkbox("Tampilkan Pairplot (bisa lambat)"):
+        sample_df = df.sample(min(len(df), 200))
+        fig4 = sns.pairplot(sample_df, hue="Personality", palette="husl", diag_kind="kde")
+        st.pyplot(fig4)
+
+# -------------------- Pemodelan Data --------------------
+elif page == "📊 Pemodelan Data":
     st.title("📊 Pemodelan Data")
 
     df_model = df.copy()
     X = df_model.drop('Personality', axis=1)
     y = df_model['Personality']
 
-    # Encode fitur kategorikal
     for col in X.columns:
         if X[col].dtype == 'object':
             le = LabelEncoder()
@@ -132,8 +148,8 @@ elif page == "Pemodelan Data":
             ax3.legend()
             st.pyplot(fig_roc)
 
-# -------------------- Halaman Prediksi --------------------
-elif page == "Prediksi":
+# -------------------- Prediksi --------------------
+elif page == "🔮 Prediksi":
     st.title("🔮 Prediksi Kepribadian")
     st.write("Masukkan nilai fitur untuk memprediksi tipe kepribadian:")
 
@@ -172,8 +188,8 @@ elif page == "Prediksi":
             prob_df = pd.Series(prob, index=target_encoder.classes_)
             st.bar_chart(prob_df)
 
-# -------------------- Halaman Anggota Kelompok --------------------
-elif page == "Anggota Kelompok":
+# -------------------- Anggota Kelompok --------------------
+elif page == "👥 Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
 
     st.markdown("""
