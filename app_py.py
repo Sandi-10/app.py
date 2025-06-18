@@ -7,15 +7,15 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
-from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
 # Load Data
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
-# Rename columns ke Bahasa Indonesia
+# Rename kolom ke Bahasa Indonesia
 df.rename(columns={
     'Age': 'Usia',
     'Gender': 'Jenis_Kelamin',
@@ -99,7 +99,7 @@ elif page == "📊 Pemodelan Data":
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     st.subheader("Pilih Model dan Parameter")
-    model_choice = st.selectbox("Model", ["Random Forest", "KNN", "SVM"])
+    model_choice = st.selectbox("Model", ["Random Forest", "KNN", "Decision Tree"])
 
     if model_choice == "Random Forest":
         n_estimators = st.slider("Jumlah Pohon (n_estimators)", 10, 200, 100)
@@ -107,10 +107,9 @@ elif page == "📊 Pemodelan Data":
     elif model_choice == "KNN":
         n_neighbors = st.slider("Jumlah Tetangga (n_neighbors)", 1, 20, 5)
         model = KNeighborsClassifier(n_neighbors=n_neighbors)
-    elif model_choice == "SVM":
-        kernel = st.selectbox("Kernel", ["linear", "rbf", "poly", "sigmoid"])
-        C_val = st.slider("Nilai C", 0.1, 10.0, 1.0)
-        model = SVC(kernel=kernel, C=C_val, probability=True)
+    elif model_choice == "Decision Tree":
+        max_depth = st.slider("Kedalaman Maksimum (max_depth)", 1, 20, 5)
+        model = DecisionTreeClassifier(max_depth=max_depth, random_state=42)
 
     if st.button("🚀 Latih Model"):
         model.fit(X_train, y_train)
