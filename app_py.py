@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from PIL import Image
 import base64
-import io
+from io import BytesIO
 
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import LabelEncoder
@@ -14,27 +14,11 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
-# Fungsi untuk mengonversi gambar ke base64
-def get_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
-
-# Tambahkan background gambar ke seluruh halaman
-bg_image = get_base64("a14f21d8-501c-4e9f-86d7-79e649c615c8.jpg")
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{bg_image}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# Fungsi simpan background base64 (tidak dipakai karena error file)
+# def get_base64(file_path):
+#     with open(file_path, "rb") as f:
+#         data = f.read()
+#     return base64.b64encode(data).decode()
 
 # Load data
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
@@ -45,16 +29,9 @@ target_encoder = LabelEncoder()
 df['Personality'] = target_encoder.fit_transform(df['Personality'])
 
 # Inisialisasi session state
-if 'model' not in st.session_state:
-    st.session_state.model = None
-if 'X_columns' not in st.session_state:
-    st.session_state.X_columns = None
-if 'X_test' not in st.session_state:
-    st.session_state.X_test = None
-if 'y_test' not in st.session_state:
-    st.session_state.y_test = None
-if 'prediction_result' not in st.session_state:
-    st.session_state.prediction_result = None
+for key in ['model', 'X_columns', 'X_test', 'y_test', 'last_prediction']:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
 # Sidebar navigasi
 st.sidebar.title("Navigasi")
@@ -64,8 +41,10 @@ page = st.sidebar.radio("Pilih Halaman:", ["Informasi", "Pemodelan Data", "Predi
 if page == "Informasi":
     st.title("📘 Informasi Dataset")
     st.write("Dataset ini berisi data kepribadian berdasarkan berbagai aspek.")
+
     st.subheader("🔍 Contoh Data")
     st.dataframe(df.head())
+
     st.subheader("📊 Deskripsi Kolom")
     st.write(df.describe(include='all'))
 
@@ -85,23 +64,25 @@ if page == "Informasi":
 elif page == "Pemodelan Data":
     st.title("📊 Pemodelan Data")
 
+    model_choice = st.selectbox("Pilih Model", ["RandomForest", "KNN", "SVM"])
     df_model = df.copy()
     X = df_model.drop('Personality', axis=1)
     y = df_model['Personality']
 
-    for col in X.select_dtypes(include='object').columns:
-        X[col] = LabelEncoder().fit_transform(X[col])
+    # Encode fitur kategorikal
+    for col in X.columns:
+        if X[col].dtype == 'object':
+            le = LabelEncoder()
+            X[col] = le.fit_transform(X[col])
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    model_choice = st.selectbox("Pilih Model", ["Random Forest", "KNN", "SVM"])
-
     if st.button("🚀 Latih Model"):
-        if model_choice == "Random Forest":
+        if model_choice == "RandomForest":
             model = RandomForestClassifier(random_state=42)
         elif model_choice == "KNN":
             model = KNeighborsClassifier()
-        else:
+        elif model_choice == "SVM":
             model = SVC(probability=True)
 
         model.fit(X_train, y_train)
@@ -133,104 +114,100 @@ elif page == "Pemodelan Data":
 # -------------------- Halaman Prediksi --------------------
 elif page == "Prediksi":
     st.title("🔮 Prediksi Kepribadian")
+
     if st.session_state.model is None:
-        st.warning("Model belum dilatih.")
+        st.warning("Model belum dilatih. Silakan buka halaman 'Pemodelan Data' dan klik 'Latih Model'.")
     else:
         input_data = {}
         for col in df.columns:
             if col != 'Personality':
                 if df[col].dtype in [np.float64, np.int64]:
-                    val = st.number_input(col, float(df[col].min()), float(df[col].max()), float(df[col].mean()))
+                    val = st.number_input(f"{col}", float(df[col].min()), float(df[col].max()), float(df[col].mean()))
                 else:
-                    val = st.selectbox(col, sorted(df[col].dropna().unique()))
+                    val = st.selectbox(f"{col}", sorted(df[col].dropna().unique()))
                 input_data[col] = val
 
         input_df = pd.DataFrame([input_data])
-        for col in input_df.select_dtypes(include='object').columns:
-            input_df[col] = LabelEncoder().fit(df[col]).transform(input_df[col])
-
-        input_df = input_df[st.session_state.X_columns]
 
         if st.button("Prediksi"):
-            model = st.session_state.model
-            prediction = model.predict(input_df)[0]
-            prob = model.predict_proba(input_df)[0]
+            for col in input_df.columns:
+                if input_df[col].dtype == 'object':
+                    le = LabelEncoder()
+                    le.fit(df[col])
+                    input_df[col] = le.transform(input_df[col])
+
+            input_df = input_df[st.session_state.X_columns]
+            prediction = st.session_state.model.predict(input_df)[0]
+            prob = st.session_state.model.predict_proba(input_df)[0]
             predicted_label = target_encoder.inverse_transform([prediction])[0]
-            st.session_state.prediction_result = pd.DataFrame({
-                'Predicted Personality': [predicted_label],
-                **{f"Prob_{label}": [p] for label, p in zip(target_encoder.classes_, prob)}
-            })
 
             st.success(f"✅ Tipe Kepribadian: *{predicted_label}*")
-            st.subheader("📈 Probabilitas")
-            st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
+            st.session_state.last_prediction = pd.DataFrame({
+                'Predicted Personality': [predicted_label],
+                **input_data
+            })
 
-        if st.session_state.prediction_result is not None:
-            st.subheader("📥 Unduh Hasil Prediksi")
-            csv = st.session_state.prediction_result.to_csv(index=False)
-            b64 = base64.b64encode(csv.encode()).decode()
-            href = f'<a href="data:file/csv;base64,{b64}" download="hasil_prediksi.csv">📥 Klik untuk unduh CSV</a>'
-            st.markdown(href, unsafe_allow_html=True)
+            st.subheader("📈 Probabilitas Prediksi")
+            prob_df = pd.Series(prob, index=target_encoder.classes_)
+            st.bar_chart(prob_df)
+
+            csv = st.session_state.last_prediction.to_csv(index=False).encode('utf-8')
+            st.download_button("⬇️ Unduh Hasil Prediksi", data=csv, file_name='hasil_prediksi.csv', mime='text/csv')
 
 # -------------------- Halaman Tuning Model --------------------
 elif page == "Tuning Model":
-    st.title("🎯 Tuning Hyperparameter")
+    st.title("🛠️ Tuning Hyperparameter")
 
-    X = df.drop('Personality', axis=1)
-    y = df['Personality']
+    model_option = st.selectbox("Pilih Model", ["RandomForest", "KNN", "SVM"])
+    X = df.drop("Personality", axis=1)
+    y = df["Personality"]
 
-    for col in X.select_dtypes(include='object').columns:
+    for col in X.select_dtypes("object").columns:
         X[col] = LabelEncoder().fit_transform(X[col])
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    model_name = st.selectbox("Pilih Model untuk Tuning", ["Random Forest", "KNN", "SVM"])
-
-    if model_name == "Random Forest":
-        param_grid = {
-            'n_estimators': [50, 100],
-            'max_depth': [None, 10, 20]
+    if model_option == "RandomForest":
+        params = {
+            "n_estimators": [50, 100],
+            "max_depth": [None, 10, 20]
         }
         model = RandomForestClassifier(random_state=42)
-    elif model_name == "KNN":
-        param_grid = {
-            'n_neighbors': [3, 5, 7],
-            'weights': ['uniform', 'distance']
+    elif model_option == "KNN":
+        params = {
+            "n_neighbors": [3, 5, 7],
+            "weights": ["uniform", "distance"]
         }
         model = KNeighborsClassifier()
-    else:
-        param_grid = {
-            'C': [0.1, 1, 10],
-            'kernel': ['linear', 'rbf']
+    elif model_option == "SVM":
+        params = {
+            "C": [0.1, 1, 10],
+            "kernel": ["linear", "rbf"]
         }
         model = SVC(probability=True)
 
-    if st.button("Mulai Grid Search"):
-        with st.spinner("⏳ Mencari parameter terbaik..."):
-            grid = GridSearchCV(model, param_grid, cv=3, scoring='accuracy')
-            grid.fit(X_train, y_train)
-            st.success("✅ Selesai!")
-            st.write("Best Parameters:", grid.best_params_)
-            st.write("Best Score:", grid.best_score_)
-            st.session_state.model = grid.best_estimator_
+    if st.button("🔍 Mulai Tuning"):
+        grid = GridSearchCV(model, params, cv=3)
+        grid.fit(X_train, y_train)
+
+        st.success(f"✅ Best Parameters: {grid.best_params_}")
+        y_pred = grid.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+        st.metric("Akurasi Terbaik", f"{acc:.2f}")
 
 # -------------------- Halaman Anggota --------------------
 elif page == "Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.image("a14f21d8-501c-4e9f-86d7-79e649c615c8.jpg", width=180)
-    with col2:
-        st.markdown("""
-        ### 👩‍🏫 Diva Auliya Pusparini  
-        🆔 NIM: 2304030041  
+    st.markdown("""
+    ### 👩‍🏫 Diva Auliya Pusparini  
+    🆔 NIM: 2304030041
 
-        ### 👩‍🎓 Paskalia Kanicha Mardian  
-        🆔 NIM: 2304030062  
+    ### 👩‍🎓 Paskalia Kanicha Mardian  
+    🆔 NIM: 2304030062
 
-        ### 👨‍💻 Sandi Krisna Mukti  
-        🆔 NIM: 2304030074  
+    ### 👨‍💻 Sandi Krisna Mukti  
+    🆔 NIM: 2304030074
 
-        ### 👩‍⚕ Siti Maisyaroh  
-        🆔 NIM: 2304030079
-        """)
+    ### 👩‍⚕ Siti Maisyaroh  
+    🆔 NIM: 2304030079
+    """)
