@@ -1,4 +1,3 @@
-# Streamlit App Lengkap untuk Prediksi Kepribadian dengan Pemilihan Model
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,18 +8,32 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 
-# Load data
+# Load Data
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
-target_encoder = LabelEncoder()
-df['Personality'] = target_encoder.fit_transform(df['Personality'])
+# Rename columns ke Bahasa Indonesia
+df.rename(columns={
+    'Age': 'Usia',
+    'Gender': 'Jenis_Kelamin',
+    'Openness': 'Keterbukaan',
+    'Neuroticism': 'Neurotisisme',
+    'Conscientiousness': 'Kehati_hatian',
+    'Agreeableness': 'Sifat_Mudah_Setuju',
+    'Extraversion': 'Ekstraversi',
+    'Time_spent_Alone': 'Waktu_Sendiri',
+    'Stage_fear': 'Takut_Panggung',
+}, inplace=True)
 
+# Encode target
+target_encoder = LabelEncoder()
+df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
+df.drop(columns=['Personality'], inplace=True)
+
+# Session state
 if 'model' not in st.session_state:
     st.session_state.model = None
 if 'X_columns' not in st.session_state:
@@ -30,116 +43,135 @@ if 'X_test' not in st.session_state:
 if 'y_test' not in st.session_state:
     st.session_state.y_test = None
 
-st.sidebar.title("Navigasi")
-page = st.sidebar.radio("Pilih Halaman", ["Informasi", "Pemodelan Data", "Prediksi", "Anggota Kelompok"])
+# Sidebar Navigasi
+st.sidebar.title("Navigasi Aplikasi")
+page = st.sidebar.radio("Pilih Halaman", ["📘 Informasi", "📊 Pemodelan Data", "🔮 Prediksi", "👥 Anggota Kelompok"])
 
-if page == "Informasi":
-    st.title("📘 Informasi Dataset")
+# ============================ INFORMASI ============================
+if page == "📘 Informasi":
+    st.title("📘 Informasi Dataset Kepribadian")
+    st.write("Dataset ini berisi informasi tentang kepribadian berdasarkan berbagai faktor psikologis.")
+
+    st.subheader("Contoh Data")
     st.dataframe(df.head())
 
-    st.subheader("Distribusi Target")
+    st.subheader("Deskripsi Statistik")
+    st.write(df.describe(include='all'))
+
+    st.subheader("Distribusi Tipe Kepribadian")
     fig1, ax1 = plt.subplots()
-    sns.countplot(data=df, x='Personality', ax=ax1)
-    ax1.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
+    sns.countplot(data=df, x='Kepribadian', ax=ax1)
+    ax1.set_xticklabels(target_encoder.inverse_transform(sorted(df['Kepribadian'].unique())))
     st.pyplot(fig1)
 
-    st.subheader("Korelasi antar Fitur")
+    st.subheader("Korelasi Antar Fitur")
     fig2, ax2 = plt.subplots()
     sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
 
-    st.subheader("Boxplot Fitur")
+    st.subheader("Boxplot Setiap Fitur")
     for col in df.select_dtypes(include=['int64', 'float64']).columns:
-        if col != 'Personality':
+        if col != 'Kepribadian':
             fig, ax = plt.subplots()
-            sns.boxplot(data=df, x='Personality', y=col, ax=ax)
-            ax.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
+            sns.boxplot(data=df, x='Kepribadian', y=col, ax=ax)
+            ax.set_title(f"Distribusi {col} berdasarkan Kepribadian")
+            ax.set_xticklabels(target_encoder.inverse_transform(sorted(df['Kepribadian'].unique())))
             st.pyplot(fig)
 
-elif page == "Pemodelan Data":
-    st.title("🧠 Pemodelan Data")
+# ============================ PEMODELAN ============================
+elif page == "📊 Pemodelan Data":
+    st.title("📊 Pemodelan Prediksi Kepribadian")
 
-    X = df.drop('Personality', axis=1)
-    y = df['Personality']
+    df_model = df.copy()
+    X = df_model.drop('Kepribadian', axis=1)
+    y = df_model['Kepribadian']
 
     for col in X.columns:
         if X[col].dtype == 'object':
             le = LabelEncoder()
             X[col] = le.fit_transform(X[col])
 
-    test_size = st.slider("Ukuran Data Uji", 0.1, 0.5, 0.2)
-    model_choice = st.selectbox("Pilih Model", ["Random Forest", "K-Nearest Neighbors", "Support Vector Machine", "Decision Tree", "Logistic Regression"])
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    params = {}
+    st.subheader("Pilih Model dan Parameter")
+    model_choice = st.selectbox("Model", ["Random Forest", "KNN", "SVM"])
+
     if model_choice == "Random Forest":
-        params['n_estimators'] = st.number_input("Jumlah Pohon", 10, 200, 100)
-    elif model_choice == "K-Nearest Neighbors":
-        params['n_neighbors'] = st.number_input("Jumlah Tetangga", 1, 20, 5)
-    elif model_choice == "Support Vector Machine":
-        params['kernel'] = st.selectbox("Kernel", ["linear", "rbf", "poly", "sigmoid"])
+        n_estimators = st.slider("Jumlah Pohon (n_estimators)", 10, 200, 100)
+        model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+    elif model_choice == "KNN":
+        n_neighbors = st.slider("Jumlah Tetangga (n_neighbors)", 1, 20, 5)
+        model = KNeighborsClassifier(n_neighbors=n_neighbors)
+    elif model_choice == "SVM":
+        kernel = st.selectbox("Kernel", ["linear", "rbf", "poly", "sigmoid"])
+        C_val = st.slider("Nilai C", 0.1, 10.0, 1.0)
+        model = SVC(kernel=kernel, C=C_val, probability=True)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
-
-    if st.button("Latih Model"):
-        if model_choice == "Random Forest":
-            model = RandomForestClassifier(n_estimators=params['n_estimators'], random_state=42)
-        elif model_choice == "K-Nearest Neighbors":
-            model = KNeighborsClassifier(n_neighbors=params['n_neighbors'])
-        elif model_choice == "Support Vector Machine":
-            model = SVC(kernel=params['kernel'], probability=True)
-        elif model_choice == "Decision Tree":
-            model = DecisionTreeClassifier(random_state=42)
-        elif model_choice == "Logistic Regression":
-            model = LogisticRegression(max_iter=1000)
-
+    if st.button("🚀 Latih Model"):
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
+
+        acc = accuracy_score(y_test, y_pred)
+        report = classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)
 
         st.session_state.model = model
         st.session_state.X_columns = X.columns.tolist()
         st.session_state.X_test = X_test
         st.session_state.y_test = y_test
 
-        st.metric("Akurasi", f"{accuracy_score(y_test, y_pred):.2f}")
-        st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)).transpose().style.format("{:.2f}"))
+        st.metric("Akurasi", f"{acc:.2f}")
 
-        fig_cm, ax = plt.subplots()
-        sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', cmap='Blues',
-                    xticklabels=target_encoder.classes_, yticklabels=target_encoder.classes_, ax=ax)
+        st.subheader("📋 Classification Report")
+        st.dataframe(pd.DataFrame(report).transpose().style.format("{:.2f}"))
+
+        st.subheader("🧩 Confusion Matrix")
+        cm = confusion_matrix(y_test, y_pred)
+        fig_cm, ax_cm = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=target_encoder.classes_, yticklabels=target_encoder.classes_, ax=ax_cm)
+        ax_cm.set_xlabel('Prediksi')
+        ax_cm.set_ylabel('Aktual')
         st.pyplot(fig_cm)
 
-        if hasattr(model, "feature_importances_"):
-            fig_imp, ax = plt.subplots()
-            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': model.feature_importances_})
-            sns.barplot(data=imp_df.sort_values('Pentingnya', ascending=False), x='Pentingnya', y='Fitur', ax=ax)
+        if hasattr(model, 'feature_importances_'):
+            st.subheader("📌 Pentingnya Fitur")
+            importance = model.feature_importances_
+            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance}).sort_values(by='Pentingnya', ascending=False)
+            fig_imp, ax_imp = plt.subplots()
+            sns.barplot(x='Pentingnya', y='Fitur', data=imp_df, palette='viridis', ax=ax_imp)
             st.pyplot(fig_imp)
 
         if len(target_encoder.classes_) == 2:
+            st.subheader("🚦 ROC Curve")
             y_prob = model.predict_proba(X_test)[:, 1]
             fpr, tpr, _ = roc_curve(y_test, y_prob)
-            fig_roc, ax = plt.subplots()
-            ax.plot(fpr, tpr, label=f"AUC = {auc(fpr, tpr):.2f}")
-            ax.plot([0, 1], [0, 1], 'k--')
-            ax.set_title("ROC Curve")
-            ax.set_xlabel("FPR")
-            ax.set_ylabel("TPR")
-            ax.legend()
+            roc_auc = auc(fpr, tpr)
+            fig_roc, ax3 = plt.subplots()
+            ax3.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
+            ax3.plot([0, 1], [0, 1], linestyle='--', color='gray')
+            ax3.set_title("ROC Curve")
+            ax3.set_xlabel("False Positive Rate")
+            ax3.set_ylabel("True Positive Rate")
+            ax3.legend()
             st.pyplot(fig_roc)
 
-elif page == "Prediksi":
-    st.title("🔮 Prediksi Kepribadian")
+# ============================ PREDIKSI ============================
+elif page == "🔮 Prediksi":
+    st.title("🔮 Prediksi Tipe Kepribadian")
+
     if st.session_state.model is None:
-        st.warning("Model belum dilatih. Silakan latih model terlebih dahulu.")
+        st.warning("Model belum dilatih. Silakan ke halaman Pemodelan.")
     else:
         input_data = {}
         for col in df.columns:
-            if col != 'Personality':
+            if col != 'Kepribadian':
                 if df[col].dtype in [np.float64, np.int64]:
-                    input_data[col] = st.number_input(col, float(df[col].min()), float(df[col].max()), float(df[col].mean()))
+                    val = st.number_input(f"{col}", float(df[col].min()), float(df[col].max()), float(df[col].mean()))
                 else:
-                    input_data[col] = st.selectbox(col, sorted(df[col].dropna().unique()))
+                    val = st.selectbox(f"{col}", sorted(df[col].dropna().unique()))
+                input_data[col] = val
 
         input_df = pd.DataFrame([input_data])
+
         for col in input_df.columns:
             if input_df[col].dtype == 'object':
                 le = LabelEncoder()
@@ -152,15 +184,16 @@ elif page == "Prediksi":
             pred = st.session_state.model.predict(input_df)[0]
             prob = st.session_state.model.predict_proba(input_df)[0]
             label = target_encoder.inverse_transform([pred])[0]
-
-            st.success(f"Prediksi Kepribadian: {label}")
+            st.success(f"Tipe Kepribadian yang Diprediksi: {label}")
+            st.subheader("Probabilitas")
             st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
 
-elif page == "Anggota Kelompok":
+# ============================ ANGGOTA ============================
+elif page == "👥 Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
     st.markdown("""
-    - Diva Auliya Pusparini (2304030041)
-    - Paskalia Kanicha Mardian (2304030062)
-    - Sandi Krisna Mukti (2304030074)
-    - Siti Maisyaroh (2304030079)
+    - 👩‍🏫 Diva Auliya Pusparini (2304030041)  
+    - 👩‍🎓 Paskalia Kanicha Mardian (2304030062)  
+    - 👨‍💻 Sandi Krisna Mukti (2304030074)  
+    - 👩‍⚕️ Siti Maisyaroh (2304030079)
     """)
