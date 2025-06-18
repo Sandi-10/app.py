@@ -1,141 +1,191 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
-import io
+import seaborn as sns
 
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
 # Load data
-@st.cache_data
-def load_data():
-    df = pd.read_csv('personality_dataset.csv')
-    return df
+url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
+df = pd.read_csv(url)
 
-# Visualisasi data awal
-def show_visualizations(df):
-    st.subheader("Visualisasi Data")
-    st.write("Distribusi Target (Kepribadian):")
-    st.bar_chart(df['Kepribadian'].value_counts())
+# Encode target
+target_encoder = LabelEncoder()
+df['Personality'] = target_encoder.fit_transform(df['Personality'])
 
-    st.write("Heatmap Korelasi:")
-    fig, ax = plt.subplots()
-    sns.heatmap(df.drop('Kepribadian', axis=1).corr(), annot=True, cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
+# Inisialisasi session state
+if 'model' not in st.session_state:
+    st.session_state.model = None
+if 'X_columns' not in st.session_state:
+    st.session_state.X_columns = None
+if 'X_test' not in st.session_state:
+    st.session_state.X_test = None
+if 'y_test' not in st.session_state:
+    st.session_state.y_test = None
 
-# Model training
-def train_model(X_train, y_train, model_name):
-    if model_name == 'Random Forest':
-        model = RandomForestClassifier()
-    elif model_name == 'KNN':
-        model = KNeighborsClassifier()
-    elif model_name == 'SVM':
-        model = SVC(probability=True)
-    else:
-        model = RandomForestClassifier()
-    model.fit(X_train, y_train)
-    return model
-
-# Visualisasi Confusion Matrix
-def show_confusion_matrix(y_test, y_pred, labels):
-    cm = confusion_matrix(y_test, y_pred, labels=labels)
-    fig, ax = plt.subplots()
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-    disp.plot(ax=ax, cmap='Blues')
-    st.pyplot(fig)
-
-# Visualisasi f1-score
-def show_f1_plot(report_dict):
-    labels = list(report_dict.keys())[:-3]  # remove avg/acc
-    f1_scores = [report_dict[label]['f1-score'] for label in labels]
-
-    fig, ax = plt.subplots()
-    sns.barplot(x=labels, y=f1_scores, palette='magma', ax=ax)
-    ax.set_title("F1-Score per Class")
-    st.pyplot(fig)
-
-# Tuning hyperparameter
-def tune_model(X, y):
-    st.subheader("Tuning Hyperparameter - Random Forest")
-    param_grid = {
-        'n_estimators': [50, 100, 150],
-        'max_depth': [None, 5, 10]
-    }
-    rf = RandomForestClassifier()
-    grid = GridSearchCV(rf, param_grid, cv=3)
-    grid.fit(X, y)
-    st.write("Best Params:", grid.best_params_)
-    return grid.best_estimator_
-
-# App Start
-st.set_page_config(layout="wide", page_title="Prediksi Kepribadian")
-
+# Sidebar navigasi
 st.sidebar.title("Navigasi")
-page = st.sidebar.radio("Pilih Halaman:", ["Informasi", "Pemodelan Data", "Tuning Model", "Prediksi", "Anggota Kelompok"])
+page_options = ["Informasi", "Pemodelan Data", "Prediksi", "Anggota Kelompok"]
+page = st.sidebar.selectbox("Navigasi", page_options)
 
-df = load_data()
-
+# -------------------- Halaman Informasi --------------------
 if page == "Informasi":
-    st.title("Informasi Dataset")
-    st.write("Dataset berisi fitur kepribadian dan label Extrovert / Introvert.")
-    st.dataframe(df.head())
-    show_visualizations(df)
+    st.title("📘 Informasi Dataset")
+    st.write("Dataset ini berisi data kepribadian berdasarkan berbagai aspek.")
 
+    st.subheader("🔍 Contoh Data")
+    st.dataframe(df.head())
+
+    st.subheader("📊 Deskripsi Kolom")
+    st.write(df.describe(include='all'))
+
+    st.subheader("🧠 Distribusi Target (Personality Type)")
+    fig_dist, ax_dist = plt.subplots()
+    sns.countplot(data=df, x='Personality', ax=ax_dist)
+    ax_dist.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
+    st.pyplot(fig_dist)
+
+    st.subheader("📉 Korelasi antar Fitur")
+    fig_corr, ax_corr = plt.subplots()
+    corr = df.corr(numeric_only=True)
+    sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax_corr)
+    st.pyplot(fig_corr)
+
+    st.subheader("📦 Boxplot Setiap Fitur Numerik")
+    for col in df.select_dtypes(include=['int64', 'float64']).columns:
+        if col != 'Personality':
+            fig, ax = plt.subplots()
+            sns.boxplot(data=df, x='Personality', y=col, ax=ax)
+            ax.set_title(f"Distribusi {col} berdasarkan Personality")
+            ax.set_xticklabels(target_encoder.inverse_transform(sorted(df['Personality'].unique())))
+            st.pyplot(fig)
+
+# -------------------- Halaman Pemodelan --------------------
 elif page == "Pemodelan Data":
     st.title("📊 Pemodelan Data")
-    model_option = st.selectbox("Pilih Model", ['Random Forest', 'KNN', 'SVM'])
-    if st.button("Latih Model"):
-        X = df.drop("Kepribadian", axis=1)
-        y = df["Kepribadian"]
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        model = train_model(X_train, y_train, model_option)
+    df_model = df.copy()
+    X = df_model.drop('Personality', axis=1)
+    y = df_model['Personality']
+
+    # Encode fitur kategorikal
+    for col in X.columns:
+        if X[col].dtype == 'object':
+            le = LabelEncoder()
+            X[col] = le.fit_transform(X[col])
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    if st.button("🚀 Latih Model"):
+        model = RandomForestClassifier(random_state=42)
+        model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
-        acc = model.score(X_test, y_test)
-        st.metric("Akurasi", f"{acc:.2f}")
+        acc = accuracy_score(y_test, y_pred)
+        report = classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)
 
-        report = classification_report(y_test, y_pred, output_dict=True)
-        st.subheader("Classification Report")
-        st.text(classification_report(y_test, y_pred))
+        st.session_state.model = model
+        st.session_state.X_columns = X.columns.tolist()
+        st.session_state.X_test = X_test
+        st.session_state.y_test = y_test
 
-        st.subheader("Confusion Matrix")
-        show_confusion_matrix(y_test, y_pred, labels=model.classes_)
+        st.subheader("🎯 Akurasi Model")
+        st.metric(label="Akurasi", value=f"{acc:.2f}")
 
-        st.subheader("F1-Score per Class")
-        show_f1_plot(report)
+        st.subheader("📋 Classification Report")
+        report_df = pd.DataFrame(report).transpose()
+        st.dataframe(report_df.style.format("{:.2f}"))
 
-elif page == "Tuning Model":
-    st.title("⚙️ Tuning Model")
-    X = df.drop("Kepribadian", axis=1)
-    y = df["Kepribadian"]
-    best_model = tune_model(X, y)
-    st.success("Model terbaik berhasil didapatkan.")
+        st.subheader("🧩 Confusion Matrix")
+        cm = confusion_matrix(y_test, y_pred)
+        fig_cm, ax = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=target_encoder.classes_,
+                    yticklabels=target_encoder.classes_, ax=ax)
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('Actual')
+        st.pyplot(fig_cm)
 
+        st.subheader("📌 Pentingnya Fitur")
+        importances = model.feature_importances_
+        imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importances}).sort_values(by='Pentingnya', ascending=False)
+        fig_imp, ax2 = plt.subplots()
+        sns.barplot(x='Pentingnya', y='Fitur', data=imp_df, palette='viridis', ax=ax2)
+        ax2.set_title("Pentingnya Fitur")
+        st.pyplot(fig_imp)
+
+        if len(target_encoder.classes_) == 2:
+            st.subheader("🚦 ROC Curve")
+            y_prob = model.predict_proba(X_test)[:, 1]
+            fpr, tpr, _ = roc_curve(y_test, y_prob)
+            roc_auc = auc(fpr, tpr)
+            fig_roc, ax3 = plt.subplots()
+            ax3.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
+            ax3.plot([0, 1], [0, 1], linestyle='--', color='gray')
+            ax3.set_title("ROC Curve")
+            ax3.set_xlabel("False Positive Rate")
+            ax3.set_ylabel("True Positive Rate")
+            ax3.legend()
+            st.pyplot(fig_roc)
+
+# -------------------- Halaman Prediksi --------------------
 elif page == "Prediksi":
-    st.title("🔍 Prediksi Kepribadian")
-    uploaded_file = st.file_uploader("Unggah file CSV untuk prediksi", type=['csv'])
-    if uploaded_file is not None:
-        pred_df = pd.read_csv(uploaded_file)
-        model = RandomForestClassifier().fit(df.drop("Kepribadian", axis=1), df["Kepribadian"])
-        pred_result = model.predict(pred_df)
-        pred_df['Hasil_Prediksi'] = pred_result
-        st.write(pred_df)
+    st.title("🔮 Prediksi Kepribadian")
+    st.write("Masukkan nilai fitur untuk memprediksi tipe kepribadian:")
 
-        # Unduh hasil
-        csv = pred_df.to_csv(index=False).encode('utf-8')
-        st.download_button("Unduh Hasil", data=csv, file_name='hasil_prediksi.csv', mime='text/csv')
+    if st.session_state.model is None:
+        st.warning("Model belum dilatih. Silakan buka halaman 'Pemodelan Data' dan klik tombol 'Latih Model'.")
+    else:
+        input_data = {}
+        for col in df.columns:
+            if col != 'Personality':
+                if df[col].dtype in [np.float64, np.int64]:
+                    val = st.number_input(f"{col}", float(df[col].min()), float(df[col].max()), float(df[col].mean()))
+                else:
+                    val = st.selectbox(f"{col}", sorted(df[col].dropna().unique()))
+                input_data[col] = val
 
+        input_df = pd.DataFrame([input_data])
+
+        if st.button("Prediksi"):
+            for col in input_df.columns:
+                if input_df[col].dtype == 'object':
+                    le = LabelEncoder()
+                    le.fit(df[col])
+                    input_df[col] = le.transform(input_df[col])
+
+            input_df = input_df[st.session_state.X_columns]
+            prediction = st.session_state.model.predict(input_df)[0]
+            prob = st.session_state.model.predict_proba(input_df)[0]
+            predicted_label = target_encoder.inverse_transform([prediction])[0]
+
+            st.success(f"✅ Tipe Kepribadian yang Diprediksi: **{predicted_label}**")
+
+            st.subheader("📋 Input Anda")
+            st.dataframe(input_df)
+
+            st.subheader("📈 Probabilitas Prediksi")
+            prob_df = pd.Series(prob, index=target_encoder.classes_)
+            st.bar_chart(prob_df)
+
+# -------------------- Halaman Anggota Kelompok --------------------
 elif page == "Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
+
     st.markdown("""
-    - Nama 1 - NIM 1  
-    - Nama 2 - NIM 2  
-    - Nama 3 - NIM 3  
-    - Nama 4 - NIM 4
+    ### 👩‍🏫 **Diva Auliya Pusparini**  
+    🆔 NIM: 2304030041  
+
+    ### 👩‍🎓 **Paskalia Kanicha Mardian**  
+    🆔 NIM: 2304030062  
+
+    ### 👨‍💻 **Sandi Krisna Mukti**  
+    🆔 NIM: 2304030074  
+
+    ### 👩‍⚕️ **Siti Maisyaroh**  
+    🆔 NIM: 2304030079
     """)
