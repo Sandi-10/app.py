@@ -19,6 +19,7 @@ st.sidebar.title("🧠 Aplikasi Prediksi Kepribadian")
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
+# Rename kolom ke Bahasa Indonesia
 df.rename(columns={
     'Age': 'Usia',
     'Gender': 'Jenis_Kelamin',
@@ -36,6 +37,7 @@ df.rename(columns={
     'Post_frequency': 'Frekuensi Membuat Postingan',
 }, inplace=True)
 
+# Encode target
 target_encoder = LabelEncoder()
 df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
@@ -47,42 +49,24 @@ for key in ['model', 'X_columns', 'X_test', 'y_test']:
 
 # ===================== Navigasi =====================
 page = st.sidebar.radio("Pilih Halaman", [
-    "📖 Panduan",
-    "📘 Informasi Dataset", 
+    "📖 Panduan & Dataset", 
     "📊 Pemodelan Data", 
     "🔮 Prediksi", 
     "👥 Anggota Kelompok"
 ])
 
-# ===================== Panduan =====================
-if page == "📖 Panduan":
-    st.title("📖 Panduan Penggunaan Aplikasi Prediksi Kepribadian")
-
+# ===================== Panduan & Dataset =====================
+if page == "📖 Panduan & Dataset":
+    st.title("📖 Panduan Penggunaan Aplikasi")
     st.markdown("""
-Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis dan sosial yang dimilikinya.
-
-#### ✨ Fitur yang Digunakan:
-- *Usia*: Umur responden.
-- *Jenis Kelamin*: Laki-laki atau perempuan.
-- *Keterbukaan (Openness), **Neurotisisme, **Kehati-hatian (Conscientiousness), **Sifat Mudah Setuju (Agreeableness), **Ekstraversi*: Lima dimensi kepribadian utama.
-- *Waktu Sendiri, **Frekuensi Keluar Rumah, **Merasa Lelah Setelah Bersosialisasi*: Indikator preferensi sosial.
-- *Takut Panggung, **Frekuensi Membuat Postingan, **Ukuran Lingkaran Pertemanan*: Ciri sosial lainnya.
-
-#### 🧠 Tentang Pemodelan:
-- *Random Forest*: Model ensemble berbasis pohon keputusan, andal dan mampu menangani banyak fitur sekaligus.
-- *Logistic Regression*: Model linier untuk klasifikasi multiklas, berguna untuk interpretasi bobot/koefisien fitur.
-
-#### 🧾 Saran Penggunaan:
-- Pastikan Anda telah memilih model dan mengatur parameter sebelum menekan tombol *Latih Model*.
-- Anda bisa melihat performa model melalui akurasi, confusion matrix, dan pentingnya fitur.
-- Untuk prediksi baru, isi semua input sesuai data dan tekan tombol *Prediksi*.
-
-> Versi saat ini menggunakan dataset bawaan dari sumber terpercaya dan tidak memungkinkan pengunggahan data eksternal.
+Aplikasi ini menggunakan pembelajaran mesin untuk memprediksi tipe kepribadian seseorang berdasarkan data psikologis.  
+Langkah-langkah penggunaannya:
+1. Tinjau informasi dataset.
+2. Latih model di halaman Pemodelan Data.
+3. Lakukan prediksi dengan input baru di halaman Prediksi.
 """)
 
-# ===================== Informasi Dataset =====================
-elif page == "📘 Informasi Dataset":
-    st.title("📘 Informasi Dataset Kepribadian")
+    st.subheader("📘 Informasi Dataset Kepribadian")
     st.dataframe(df.head())
 
     st.subheader("Deskripsi Statistik")
@@ -152,17 +136,39 @@ elif page == "📊 Pemodelan Data":
 
         st.subheader("📋 Classification Report")
         st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)).transpose().style.format("{:.2f}"))
+        st.markdown("""
+📝 **Penjelasan**:  
+- **Precision**: Ketepatan model dalam memprediksi setiap tipe kepribadian.  
+- **Recall**: Kemampuan model mengenali seluruh contoh dari tipe tersebut.  
+- **F1-Score**: Rata-rata harmonis Precision dan Recall.  
+- **Support**: Jumlah data aktual untuk tiap kelas.  
+""")
 
         st.subheader("🧩 Confusion Matrix")
         cm = confusion_matrix(y_test, y_pred)
         fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                    xticklabels=target_encoder.classes_,
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                    xticklabels=target_encoder.classes_, 
                     yticklabels=target_encoder.classes_,
                     ax=ax)
         ax.set_xlabel("Prediksi")
         ax.set_ylabel("Aktual")
         st.pyplot(fig)
+        st.markdown("""
+🧠 **Penjelasan**:  
+- Baris menunjukkan label asli, kolom adalah prediksi model.  
+- Angka diagonal → prediksi benar, lainnya → kesalahan klasifikasi.  
+""")
+
+        if model_choice == "Logistic Regression":
+            st.subheader("📎 Koefisien Fitur")
+            coef_df = pd.DataFrame(model.coef_, columns=X.columns, index=target_encoder.classes_)
+            st.dataframe(coef_df.style.format("{:.2f}"))
+            st.markdown("""
+📌 **Penjelasan**:  
+- Koefisien positif → meningkatkan peluang masuk ke kelas tersebut.  
+- Koefisien negatif → menurunkan peluang masuk ke kelas tersebut.  
+""")
 
         if hasattr(model, 'feature_importances_'):
             st.subheader("📌 Pentingnya Fitur")
@@ -171,16 +177,10 @@ elif page == "📊 Pemodelan Data":
             fig2, ax2 = plt.subplots()
             sns.barplot(x='Penting', y='Fitur', data=imp_df.sort_values(by='Penting', ascending=False), palette='viridis', ax=ax2)
             st.pyplot(fig2)
-
-        if isinstance(model, LogisticRegression):
-            st.subheader("📉 Koefisien Fitur (Logistic Regression)")
-            coef_df = pd.DataFrame({
-                'Fitur': X.columns,
-                'Koefisien': model.coef_[0]
-            }).sort_values(by='Koefisien', ascending=False)
-            fig3, ax3 = plt.subplots()
-            sns.barplot(x='Koefisien', y='Fitur', data=coef_df, palette='coolwarm', ax=ax3)
-            st.pyplot(fig3)
+            st.markdown("""
+📌 **Penjelasan**:  
+- Semakin tinggi nilainya, semakin besar pengaruh fitur tersebut dalam pengambilan keputusan model.  
+""")
 
 # ===================== Prediksi =====================
 elif page == "🔮 Prediksi":
@@ -220,5 +220,5 @@ elif page == "👥 Anggota Kelompok":
 - 👩‍🏫 Diva Auliya Pusparini (2304030041)  
 - 👩‍🎓 Paskalia Kanicha Mardian (2304030062)  
 - 👨‍💻 Sandi Krisna Mukti (2304030074)  
-- 👩‍⚕ Siti Maisyaroh (2304030079)
+- 👩‍⚕️ Siti Maisyaroh (2304030079)
 """)
