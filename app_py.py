@@ -4,15 +4,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
-# Load dataset
-url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
-df = pd.read_csv(url)
+# Load Data
+uploaded = st.file_uploader("Unggah dataset (CSV)", type="csv")
+if uploaded is not None:
+    df = pd.read_csv(uploaded)
+else:
+    url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
+    df = pd.read_csv(url)
 
 # Rename kolom ke Bahasa Indonesia
 df.rename(columns={
@@ -37,43 +41,42 @@ target_encoder = LabelEncoder()
 df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
 
-# Session State
-if 'model' not in st.session_state:
-    st.session_state.model = None
-if 'X_columns' not in st.session_state:
-    st.session_state.X_columns = None
-if 'X_test' not in st.session_state:
-    st.session_state.X_test = None
-if 'y_test' not in st.session_state:
-    st.session_state.y_test = None
+# Session state
+for key in ['model', 'X_columns', 'X_test', 'y_test']:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
-# Navigasi
+# Sidebar Navigasi
 st.sidebar.title("Navigasi Aplikasi")
-page = st.sidebar.radio("Pilih Halaman", ["📖 Petunjuk", "📘 Informasi", "📊 Pemodelan Data", "🔮 Prediksi", "👥 Anggota Kelompok"])
+page = st.sidebar.radio("Pilih Halaman", [
+    "📌 Petunjuk Penggunaan", 
+    "📘 Informasi Dataset", 
+    "📊 Pemodelan Data", 
+    "🔮 Prediksi", 
+    "👥 Anggota Kelompok"
+])
 
-# ================= PETUNJUK ==================
-if page == "📖 Petunjuk":
-    st.title("📖 Petunjuk Penggunaan Aplikasi")
+# ============================ PETUNJUK ============================
+if page == "📌 Petunjuk Penggunaan":
+    st.title("📌 Petunjuk Penggunaan Aplikasi")
     st.markdown("""
-    Selamat datang di Aplikasi Prediksi Tipe Kepribadian!
-
-    **Fitur aplikasi ini meliputi:**
-    - Eksplorasi dataset kepribadian
-    - Pemodelan dengan algoritma Random Forest dan Logistic Regression
-    - Prediksi manual berbasis input pengguna
-    - Penjelasan lengkap pada tiap langkah visualisasi
-
-    **Langkah-langkah:**
-    1. Buka halaman '📘 Informasi' untuk eksplorasi dataset
-    2. Kunjungi '📊 Pemodelan Data' untuk melatih model
-    3. Lakukan prediksi dengan input manual di '🔮 Prediksi'
-    4. Lihat nama anggota tim di '👥 Anggota Kelompok'
+    Selamat datang di aplikasi prediksi tipe kepribadian!
+    
+    Berikut adalah langkah-langkah menggunakan aplikasi ini:
+    
+    1. Buka halaman 📘 Informasi Dataset untuk melihat isi dan statistik dataset.
+    2. Masuk ke halaman 📊 Pemodelan Data untuk memilih dan melatih model prediksi.
+    3. Setelah model dilatih, gunakan halaman 🔮 Prediksi untuk mengisi data dan melihat hasil prediksi.
+    
+    📢 Catatan:
+    - Anda bisa mengunggah dataset sendiri (opsional).
+    - Gunakan model Random Forest atau Logistic Regression untuk prediksi.
     """)
 
-# ================= INFORMASI ==================
-elif page == "📘 Informasi":
+# ============================ INFORMASI ============================
+elif page == "📘 Informasi Dataset":
     st.title("📘 Informasi Dataset Kepribadian")
-    st.write("Dataset ini berisi berbagai fitur yang diasosiasikan dengan kepribadian manusia berdasarkan psikologi.")
+    st.write("Dataset ini berisi informasi tentang kepribadian berdasarkan berbagai faktor psikologis.")
 
     st.subheader("Contoh Data")
     st.dataframe(df.head())
@@ -82,19 +85,17 @@ elif page == "📘 Informasi":
     st.write(df.describe(include='all'))
 
     st.subheader("Distribusi Tipe Kepribadian")
-    fig, ax = plt.subplots()
-    sns.countplot(data=df, x='Kepribadian', ax=ax)
-    ax.set_xticklabels(target_encoder.inverse_transform(sorted(df['Kepribadian'].unique())))
-    st.pyplot(fig)
-    st.caption("Distribusi ini menunjukkan jumlah sampel untuk setiap kelas kepribadian.")
+    fig1, ax1 = plt.subplots()
+    sns.countplot(data=df, x='Kepribadian', ax=ax1)
+    ax1.set_xticklabels(target_encoder.inverse_transform(sorted(df['Kepribadian'].unique())))
+    st.pyplot(fig1)
 
-    st.subheader("Korelasi Antar Fitur Numerik")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
-    st.caption("Matriks korelasi ini membantu kita memahami hubungan antar fitur numerik.")
+    st.subheader("Korelasi Antar Fitur")
+    fig2, ax2 = plt.subplots()
+    sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
+    st.pyplot(fig2)
 
-# ================= PEMODELAN ==================
+# ============================ PEMODELAN ============================
 elif page == "📊 Pemodelan Data":
     st.title("📊 Pemodelan Prediksi Kepribadian")
 
@@ -109,31 +110,36 @@ elif page == "📊 Pemodelan Data":
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    model_choice = st.selectbox("Pilih Model", ["Random Forest", "Logistic Regression"])
+    st.subheader("Pilih Model dan Parameter")
+    model_choice = st.selectbox("Model", ["Random Forest", "Logistic Regression"])
 
     if model_choice == "Random Forest":
-        n_estimators = st.slider("Jumlah Pohon", 10, 200, 100)
+        n_estimators = st.slider("Jumlah Pohon (n_estimators)", 10, 200, 100)
         model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
-    else:
-        max_iter = st.slider("Jumlah Iterasi", 100, 500, 200)
-        model = LogisticRegression(max_iter=max_iter)
+    elif model_choice == "Logistic Regression":
+        model = LogisticRegression(max_iter=500)
 
-    if st.button("Latih Model"):
+    if st.button("🚀 Latih Model"):
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
+
+        acc = accuracy_score(y_test, y_pred)
+        report = classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)
 
         st.session_state.model = model
         st.session_state.X_columns = X.columns.tolist()
         st.session_state.X_test = X_test
         st.session_state.y_test = y_test
 
-        acc = accuracy_score(y_test, y_pred)
-        st.metric("Akurasi Model", f"{acc:.2f}")
+        st.metric("Akurasi Data Uji", f"{acc:.2f}")
+
+        with st.spinner("Melakukan Cross-Validation..."):
+            cv_scores = cross_val_score(model, X_train, y_train, cv=5)
+            st.metric("Cross-Validation Akurasi (rata-rata)", f"{cv_scores.mean():.2f}")
+            st.write("Akurasi per Fold:", [f"{score:.2f}" for score in cv_scores])
 
         st.subheader("📋 Classification Report")
-        report = classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)
         st.dataframe(pd.DataFrame(report).transpose().style.format("{:.2f}"))
-        st.caption("Classification report menampilkan metrik precision, recall, dan f1-score per kelas.")
 
         st.subheader("🧩 Confusion Matrix")
         cm = confusion_matrix(y_test, y_pred)
@@ -145,16 +151,14 @@ elif page == "📊 Pemodelan Data":
         ax_cm.set_xlabel('Prediksi')
         ax_cm.set_ylabel('Aktual')
         st.pyplot(fig_cm)
-        st.caption("Confusion matrix menunjukkan performa model dalam membedakan tiap kelas.")
 
         if hasattr(model, 'feature_importances_'):
             st.subheader("📌 Pentingnya Fitur")
             importance = model.feature_importances_
-            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance}).sort_values(by='Pentingnya', ascending=False)
+            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance})
             fig_imp, ax_imp = plt.subplots()
-            sns.barplot(x='Pentingnya', y='Fitur', data=imp_df, palette='viridis', ax=ax_imp)
+            sns.barplot(x='Pentingnya', y='Fitur', data=imp_df.sort_values(by='Pentingnya', ascending=False), palette='viridis', ax=ax_imp)
             st.pyplot(fig_imp)
-            st.caption("Grafik ini menunjukkan seberapa besar kontribusi setiap fitur dalam prediksi model.")
 
         if len(target_encoder.classes_) == 2:
             st.subheader("🚦 ROC Curve")
@@ -169,14 +173,13 @@ elif page == "📊 Pemodelan Data":
             ax3.set_ylabel("True Positive Rate")
             ax3.legend()
             st.pyplot(fig_roc)
-            st.caption("Kurva ROC digunakan untuk mengevaluasi kemampuan model dalam klasifikasi biner.")
 
-# ================= PREDIKSI ==================
+# ============================ PREDIKSI ============================
 elif page == "🔮 Prediksi":
     st.title("🔮 Prediksi Tipe Kepribadian")
 
     if st.session_state.model is None:
-        st.warning("Model belum dilatih. Silakan ke halaman Pemodelan terlebih dahulu.")
+        st.warning("Model belum dilatih. Silakan ke halaman Pemodelan.")
     else:
         input_data = {}
         for col in df.columns:
@@ -205,7 +208,7 @@ elif page == "🔮 Prediksi":
             st.subheader("Probabilitas")
             st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
 
-# ================= ANGGOTA ==================
+# ============================ ANGGOTA ============================
 elif page == "👥 Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
     st.markdown("""
