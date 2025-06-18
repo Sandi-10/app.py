@@ -65,8 +65,7 @@ Langkah-langkah penggunaannya:
 2. Latih model di halaman Pemodelan Data.
 3. Masukkan data baru di halaman Prediksi untuk melihat hasil kepribadian.
 """)
-    # Gambar panduan dihilangkan untuk mencegah error file tidak ditemukan
-    # st.image("Cuplikan layar 2025-06-18 185039.png", use_column_width=True)
+    st.image("Cuplikan layar 2025-06-18 185039.png", use_column_width=True)
 
 # ===================== Informasi Dataset =====================
 elif page == "📘 Informasi Dataset":
