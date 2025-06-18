@@ -4,15 +4,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
 # Load Data
-url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
-df = pd.read_csv(url)
+uploaded = st.file_uploader("Unggah dataset (CSV)", type="csv")
+if uploaded is not None:
+    df = pd.read_csv(uploaded)
+else:
+    url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
+    df = pd.read_csv(url)
 
 # Rename kolom ke Bahasa Indonesia
 df.rename(columns={
@@ -38,30 +42,35 @@ df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
 
 # Session state
-if 'model' not in st.session_state:
-    st.session_state.model = None
-if 'X_columns' not in st.session_state:
-    st.session_state.X_columns = None
-if 'X_test' not in st.session_state:
-    st.session_state.X_test = None
-if 'y_test' not in st.session_state:
-    st.session_state.y_test = None
+for key in ['model', 'X_columns', 'X_test', 'y_test']:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
 # Sidebar Navigasi
 st.sidebar.title("Navigasi Aplikasi")
-page = st.sidebar.radio("Pilih Halaman", ["📖 Panduan", "📘 Informasi Dataset", "📊 Pemodelan Data", "🔮 Prediksi", "👥 Anggota Kelompok"])
+page = st.sidebar.radio("Pilih Halaman", [
+    "📌 Petunjuk Penggunaan", 
+    "📘 Informasi Dataset", 
+    "📊 Pemodelan Data", 
+    "🔮 Prediksi", 
+    "👥 Anggota Kelompok"
+])
 
-# ============================ PANDUAN ============================
-if page == "📖 Panduan":
-    st.title("📖 Panduan Penggunaan Aplikasi")
+# ============================ PETUNJUK ============================
+if page == "📌 Petunjuk Penggunaan":
+    st.title("📌 Petunjuk Penggunaan Aplikasi")
     st.markdown("""
-    Selamat datang di aplikasi prediksi tipe kepribadian.
-
-    **Petunjuk Penggunaan:**
-    - Buka halaman **Informasi Dataset** untuk melihat gambaran data.
-    - Gunakan halaman **Pemodelan Data** untuk memilih model dan melatih data.
-    - Masuk ke halaman **Prediksi** untuk memprediksi kepribadian berdasarkan input fitur.
-    - Halaman **Anggota Kelompok** menampilkan kontributor proyek.
+    Selamat datang di aplikasi prediksi tipe kepribadian!
+    
+    Berikut adalah langkah-langkah menggunakan aplikasi ini:
+    
+    1. Buka halaman 📘 Informasi Dataset untuk melihat isi dan statistik dataset.
+    2. Masuk ke halaman 📊 Pemodelan Data untuk memilih dan melatih model prediksi.
+    3. Setelah model dilatih, gunakan halaman 🔮 Prediksi untuk mengisi data dan melihat hasil prediksi.
+    
+    📢 Catatan:
+    - Anda bisa mengunggah dataset sendiri (opsional).
+    - Gunakan model Random Forest atau Logistic Regression untuk prediksi.
     """)
 
 # ============================ INFORMASI ============================
@@ -108,7 +117,7 @@ elif page == "📊 Pemodelan Data":
         n_estimators = st.slider("Jumlah Pohon (n_estimators)", 10, 200, 100)
         model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
     elif model_choice == "Logistic Regression":
-        model = LogisticRegression(max_iter=1000)
+        model = LogisticRegression(max_iter=500)
 
     if st.button("🚀 Latih Model"):
         model.fit(X_train, y_train)
@@ -122,7 +131,12 @@ elif page == "📊 Pemodelan Data":
         st.session_state.X_test = X_test
         st.session_state.y_test = y_test
 
-        st.metric("Akurasi", f"{acc:.2f}")
+        st.metric("Akurasi Data Uji", f"{acc:.2f}")
+
+        with st.spinner("Melakukan Cross-Validation..."):
+            cv_scores = cross_val_score(model, X_train, y_train, cv=5)
+            st.metric("Cross-Validation Akurasi (rata-rata)", f"{cv_scores.mean():.2f}")
+            st.write("Akurasi per Fold:", [f"{score:.2f}" for score in cv_scores])
 
         st.subheader("📋 Classification Report")
         st.dataframe(pd.DataFrame(report).transpose().style.format("{:.2f}"))
@@ -130,7 +144,10 @@ elif page == "📊 Pemodelan Data":
         st.subheader("🧩 Confusion Matrix")
         cm = confusion_matrix(y_test, y_pred)
         fig_cm, ax_cm = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=target_encoder.classes_, yticklabels=target_encoder.classes_, ax=ax_cm)
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=target_encoder.classes_,
+                    yticklabels=target_encoder.classes_,
+                    ax=ax_cm)
         ax_cm.set_xlabel('Prediksi')
         ax_cm.set_ylabel('Aktual')
         st.pyplot(fig_cm)
@@ -138,9 +155,9 @@ elif page == "📊 Pemodelan Data":
         if hasattr(model, 'feature_importances_'):
             st.subheader("📌 Pentingnya Fitur")
             importance = model.feature_importances_
-            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance}).sort_values(by='Pentingnya', ascending=False)
+            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance})
             fig_imp, ax_imp = plt.subplots()
-            sns.barplot(x='Pentingnya', y='Fitur', data=imp_df, palette='viridis', ax=ax_imp)
+            sns.barplot(x='Pentingnya', y='Fitur', data=imp_df.sort_values(by='Pentingnya', ascending=False), palette='viridis', ax=ax_imp)
             st.pyplot(fig_imp)
 
         if len(target_encoder.classes_) == 2:
