@@ -1,146 +1,181 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix
-from PIL import Image
+import seaborn as sns
 import base64
+from PIL import Image
 
-# Fungsi load dataset
-@st.cache_data
-def load_data():
-    df = pd.read_csv("personality_dataset.csv")
-    return df
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
-# Fungsi encode gambar background (jika digunakan)
+# ==================== Fungsi Tambahan ====================
 def get_base64(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
 
-# Load data
-df = load_data()
+def encode_input(df_input, df_ref):
+    df_encoded = df_input.copy()
+    for col in df_input.columns:
+        if df_input[col].dtype == 'object':
+            le = LabelEncoder()
+            le.fit(df_ref[col])
+            df_encoded[col] = le.transform(df_input[col])
+    return df_encoded
 
-# Persiapan data
-X = df.drop(columns=["Personality (Class label)"])
-y = df["Personality (Class label)"]
+# ==================== Load & Persiapan Data ====================
+url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
+df = pd.read_csv(url)
+df_raw = df.copy()
 
-# Sidebar navigasi
+# Encode target
+target_encoder = LabelEncoder()
+df['Personality'] = target_encoder.fit_transform(df['Personality'])
+
+# Encode fitur kategorikal
+X = df.drop('Personality', axis=1)
+y = df['Personality']
+for col in X.select_dtypes(include='object').columns:
+    le = LabelEncoder()
+    X[col] = le.fit_transform(X[col])
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# ==================== Streamlit Setup ====================
+bg_image = get_base64("a14f21d8-501c-4e9f-86d7-79e649c615c8.jpg")
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/jpg;base64,{bg_image}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+    </style>
+    """, unsafe_allow_html=True
+)
+
+# ==================== Navigasi Halaman ====================
 st.sidebar.title("Navigasi")
-page = st.sidebar.radio("Pilih Halaman", ["Informasi Dataset", "Pemodelan", "Prediksi", "Tuning Hyperparameter"])
+page = st.sidebar.radio("Pilih Halaman:", ["Informasi", "Pemodelan Data", "Tuning Model", "Prediksi", "Anggota Kelompok"])
 
-# ===============================
-# 1. INFORMASI DATASET
-# ===============================
-if page == "Informasi Dataset":
-    st.title("Informasi Dataset Kepribadian")
-    st.write("Dataset ini berisi fitur kepribadian dan label kepribadian target.")
-    st.dataframe(df.head())
+# ==================== Halaman Informasi ====================
+if page == "Informasi":
+    st.title("📘 Informasi Dataset")
+    st.write("Dataset ini berisi data kepribadian berdasarkan berbagai aspek.")
+    st.dataframe(df_raw.head())
+    st.write(df_raw.describe(include='all'))
 
-    st.subheader("Statistik Deskriptif")
-    st.dataframe(df.describe())
+    st.subheader("Distribusi Personality")
+    fig, ax = plt.subplots()
+    sns.countplot(x=target_encoder.inverse_transform(df['Personality']), ax=ax)
+    ax.set_xlabel("Personality")
+    st.pyplot(fig)
 
-    st.subheader("Distribusi Label")
-    st.bar_chart(df["Personality (Class label)"].value_counts())
+# ==================== Halaman Pemodelan ====================
+elif page == "Pemodelan Data":
+    st.title("📊 Pemodelan Data")
+    model_option = st.selectbox("Pilih Model", ["Random Forest", "SVM", "KNN"])
 
-# ===============================
-# 2. PEMODELAN
-# ===============================
-elif page == "Pemodelan":
-    st.title("Pemodelan Klasifikasi Kepribadian")
+    if st.button("Latih Model"):
+        if model_option == "Random Forest":
+            model = RandomForestClassifier(random_state=42)
+        elif model_option == "SVM":
+            model = SVC(probability=True)
+        elif model_option == "KNN":
+            model = KNeighborsClassifier()
 
-    model_choice = st.selectbox("Pilih Model", ["Random Forest", "KNN", "SVM"])
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        acc = accuracy_score(y_test, y_pred)
+        st.metric("Akurasi", f"{acc:.2f}")
+        st.subheader("Classification Report")
+        st.text(classification_report(y_test, y_pred, target_names=target_encoder.classes_))
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        st.subheader("Confusion Matrix")
+        fig_cm, ax = plt.subplots()
+        sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', cmap='Blues',
+                    xticklabels=target_encoder.classes_,
+                    yticklabels=target_encoder.classes_, ax=ax)
+        st.pyplot(fig_cm)
 
-    if model_choice == "Random Forest":
-        model = RandomForestClassifier()
-    elif model_choice == "KNN":
-        model = KNeighborsClassifier()
-    else:
-        model = SVC()
+        # Simpan model ke sesi
+        st.session_state.model = model
+        st.session_state.X_columns = X.columns.tolist()
 
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+# ==================== Halaman Tuning Model ====================
+elif page == "Tuning Model":
+    st.title("🎯 Tuning Hyperparameter - Random Forest")
+    if st.button("Lakukan Tuning"):
+        param_dist = {
+            "n_estimators": [50, 100, 200],
+            "max_depth": [None, 10, 20],
+            "min_samples_split": [2, 5],
+            "min_samples_leaf": [1, 2],
+        }
+        rs = RandomizedSearchCV(RandomForestClassifier(), param_dist, n_iter=5, cv=3, random_state=42)
+        rs.fit(X_train, y_train)
+        st.write("Best Params:", rs.best_params_)
+        y_pred = rs.predict(X_test)
+        st.metric("Akurasi Tuning", f"{accuracy_score(y_test, y_pred):.2f}")
+        st.session_state.model = rs.best_estimator_
 
-    st.subheader("Confusion Matrix")
-    st.text(confusion_matrix(y_test, y_pred))
-
-    st.subheader("Classification Report")
-    st.text(classification_report(y_test, y_pred))
-
-# ===============================
-# 3. PREDIKSI
-# ===============================
+# ==================== Halaman Prediksi ====================
 elif page == "Prediksi":
-    st.title("Prediksi Kepribadian")
+    st.title("🔮 Prediksi Kepribadian")
+    if 'model' not in st.session_state:
+        st.warning("Model belum dilatih. Silakan latih di halaman Pemodelan.")
+    else:
+        input_data = {}
+        for col in df_raw.columns:
+            if col != 'Personality':
+                if df_raw[col].dtype == object:
+                    input_data[col] = st.selectbox(col, df_raw[col].unique())
+                else:
+                    input_data[col] = st.slider(col, int(df_raw[col].min()), int(df_raw[col].max()), int(df_raw[col].mean()))
+        input_df = pd.DataFrame([input_data])
+        input_encoded = encode_input(input_df, df_raw)
 
-    st.write("Masukkan nilai fitur berikut untuk prediksi:")
-    inputs = {}
-    for col in X.columns:
-        inputs[col] = st.slider(col, float(df[col].min()), float(df[col].max()), float(df[col].mean()))
+        if st.button("Prediksi"):
+            model = st.session_state.model
+            input_encoded = input_encoded[st.session_state.X_columns]
+            pred = model.predict(input_encoded)[0]
+            prob = model.predict_proba(input_encoded)[0]
+            result = target_encoder.inverse_transform([pred])[0]
+            st.success(f"Tipe Kepribadian yang Diprediksi: {result}")
 
-    input_df = pd.DataFrame([inputs])
+            st.subheader("Probabilitas:")
+            prob_df = pd.Series(prob, index=target_encoder.classes_)
+            st.bar_chart(prob_df)
 
-    model = RandomForestClassifier()
-    model.fit(X, y)
-    pred = model.predict(input_df)
+            # Unduh hasil
+            hasil_df = pd.DataFrame({**input_data, "Prediksi": result}, index=[0])
+            csv = hasil_df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Unduh Hasil", csv, file_name="hasil_prediksi.csv", mime='text/csv')
 
-    st.subheader("Hasil Prediksi")
-    st.success(f"Prediksi Kepribadian: {pred[0]}")
+# ==================== Halaman Anggota ====================
+elif page == "Anggota Kelompok":
+    st.title("👥 Anggota Kelompok")
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.image("a14f21d8-501c-4e9f-86d7-79e649c615c8.jpg", width=180)
+    with col2:
+        st.markdown("""
+        ### 👩‍🏫 *Diva Auliya Pusparini*  
+        🆔 NIM: 2304030041  
 
-    # Unduh hasil
-    output = pd.DataFrame(input_df)
-    output["Hasil Prediksi"] = pred
-    csv = output.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()
-    href = f'<a href="data:file/csv;base64,{b64}" download="hasil_prediksi.csv">Unduh Hasil Prediksi</a>'
-    st.markdown(href, unsafe_allow_html=True)
+        ### 👩‍🎓 *Paskalia Kanicha Mardian*  
+        🆔 NIM: 2304030062  
 
-# ===============================
-# 4. TUNING HYPERPARAMETER
-# ===============================
-elif page == "Tuning Hyperparameter":
-    st.title("🔧 Tuning Hyperparameter")
+        ### 👨‍💻 *Sandi Krisna Mukti*  
+        🆔 NIM: 2304030074  
 
-    model_select = st.selectbox("Pilih Model", ["Random Forest", "KNN", "SVM"])
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    if model_select == "Random Forest":
-        param_grid = {
-            "n_estimators": [50, 100],
-            "max_depth": [None, 10, 20]
-        }
-        model = RandomForestClassifier()
-    elif model_select == "KNN":
-        param_grid = {
-            "n_neighbors": [3, 5, 7],
-            "weights": ["uniform", "distance"]
-        }
-        model = KNeighborsClassifier()
-    elif model_select == "SVM":
-        param_grid = {
-            "C": [0.1, 1, 10],
-            "kernel": ["linear", "rbf"]
-        }
-        model = SVC()
-
-    if st.button("🔍 Mulai Tuning"):
-        try:
-            grid = GridSearchCV(model, param_grid, cv=3)
-            grid.fit(X_train, y_train)
-            best_model = grid.best_estimator_
-            st.success("Tuning selesai.")
-            st.write("Best Parameters:", grid.best_params_)
-
-            y_pred = best_model.predict(X_test)
-            st.subheader("Classification Report")
-            st.text(classification_report(y_test, y_pred))
-        except Exception as e:
-            st.error("Terjadi error saat tuning. Periksa parameter atau data input.")
-            st.exception(e)
+        ### 👩‍⚕ *Siti Maisyaroh*  
+        🆔 NIM: 2304030079
+        """)
