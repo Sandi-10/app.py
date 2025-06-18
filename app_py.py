@@ -58,7 +58,7 @@ if page == "📖 Panduan":
     st.title("📖 Panduan Penggunaan Aplikasi Prediksi Kepribadian")
     st.markdown("""
     Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis.
-    ...
+    Masuk ke menu Pemodelan untuk melatih model dan ke halaman Prediksi untuk mencoba prediksi berdasarkan input Anda.
     """)
 
 # ============================ PETUNJUK ============================
@@ -66,7 +66,10 @@ elif page == "📌 Petunjuk Penggunaan":
     st.title("📌 Petunjuk Penggunaan Aplikasi")
     st.markdown("""
     Berikut adalah langkah-langkah menggunakan aplikasi ini:
-    ...
+
+    1. Buka halaman "📘 Informasi Dataset" untuk melihat data dan statistik dasar.
+    2. Buka halaman "📊 Pemodelan Data" untuk melatih model prediksi.
+    3. Setelah model dilatih, buka halaman "🔮 Prediksi" untuk memprediksi kepribadian berdasarkan data input Anda.
     """)
 
 # ============================ INFORMASI ============================
