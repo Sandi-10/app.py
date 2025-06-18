@@ -1,225 +1,181 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
-
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import LabelEncoder
+import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
 
-# ===================== Informasi Aplikasi =====================
-st.set_page_config(page_title="Prediksi Kepribadian", layout="wide")
-st.sidebar.image("https://img.icons8.com/ios-filled/100/psychology.png", width=80)
+# Load dataset
+@st.cache_data
+def load_data():
+    df = pd.read_csv("personality_dataset.csv")  # Ganti sesuai nama file dataset Anda
+    return df
+
+df = load_data()
+
+# Sidebar navigasi
 st.sidebar.title("🧠 Aplikasi Prediksi Kepribadian")
+page = st.sidebar.radio("Pilih Halaman", ["📖 Panduan", "📊 Informasi Dataset", "📈 Pemodelan Data", "🤔 Prediksi", "👥 Anggota", "🧩 Kelompok"])
 
-# ===================== Load Dataset =====================
-url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
-df = pd.read_csv(url)
-
-df.rename(columns={
-    'Age': 'Usia',
-    'Gender': 'Jenis_Kelamin',
-    'Openness': 'Keterbukaan',
-    'Neuroticism': 'Neurotisisme',
-    'Conscientiousness': 'Kehati_hatian',
-    'Agreeableness': 'Sifat_Mudah_Setuju',
-    'Extraversion': 'Ekstraversi',
-    'Time_spent_Alone': 'Waktu_Sendiri',
-    'Stage_fear': 'Takut_Panggung',
-    'Social_event_attendance': 'Frekuensi Menghadiri Acara Sosial',
-    'Going_outside': 'Frekuensi Keluar Rumah',
-    'Drained_after_socializing': 'Merasa Lelah Setelah Bersosialisasi',
-    'Friends_circle_size': 'Ukuran Lingkaran Pertemanan',
-    'Post_frequency': 'Frekuensi Membuat Postingan',
-}, inplace=True)
-
-# Encode target
-target_encoder = LabelEncoder()
-df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
-df.drop(columns=['Personality'], inplace=True)
-
-# ===================== Session State =====================
-for key in ['model', 'X_columns', 'X_test', 'y_test']:
-    if key not in st.session_state:
-        st.session_state[key] = None
-
-# ===================== Navigasi =====================
-page = st.sidebar.radio("Pilih Halaman", [
-    "📖 Panduan",
-    "📘 Informasi Dataset",
-    "📊 Pemodelan Data",
-    "🔮 Prediksi",
-    "👥 Anggota Kelompok"
-])
-
-# ===================== Panduan =====================
+# Halaman 1: Panduan
 if page == "📖 Panduan":
     st.title("📖 Panduan Penggunaan Aplikasi")
+
     st.markdown("""
-Aplikasi ini menggunakan pembelajaran mesin untuk memprediksi tipe kepribadian seseorang berdasarkan data psikologis.  
-Langkah-langkah penggunaannya:
-1. Tinjau informasi dataset (struktur data, statistik, korelasi, dan visualisasi).
-2. Latih model di halaman Pemodelan Data.
-3. Masukkan data baru di halaman Prediksi untuk melihat hasil kepribadian.
-""")
-    st.image("Cuplikan layar 2025-06-18 185039.png", use_column_width=True)
+    Aplikasi ini menggunakan pembelajaran mesin untuk memprediksi tipe kepribadian seseorang berdasarkan data psikologis.
 
-# ===================== Informasi Dataset =====================
-elif page == "📘 Informasi Dataset":
-    st.title("📘 Informasi Dataset Kepribadian")
+    Langkah-langkah penggunaannya:
+    1. Tinjau informasi dataset (struktur data, statistik, korelasi, dan visualisasi).
+    2. Latih model di halaman Pemodelan Data.
+    3. Masukkan data baru di halaman Prediksi untuk melihat hasil kepribadian.
 
-    st.markdown("### ℹ️ Informasi Dataset")
+    #### ✨ Fitur yang Digunakan:
+    - **Usia**
+    - **Jenis Kelamin**
+    - **Openness, Neuroticism, Conscientiousness, Agreeableness, Extraversion**
+    - **Waktu Sendiri, Frekuensi Keluar Rumah, Merasa Lelah Setelah Bersosialisasi**
+    - **Takut Panggung, Frekuensi Membuat Postingan, Ukuran Lingkaran Pertemanan**
+
+    #### 🧠 Tentang Pemodelan:
+    - **Random Forest**: Model ensemble berbasis pohon keputusan, andal untuk menangani banyak fitur dan klasifikasi multiklas.
+    - **Logistic Regression**: Model linier untuk klasifikasi multiklas, berguna untuk interpretasi koefisien fitur.
+
+    #### 💡 Saran Penggunaan:
+    - Pastikan Anda telah memilih model dan mengatur parameter sebelum menekan tombol **Latih Model**.
+    - Anda bisa melihat performa model melalui akurasi, confusion matrix, dan pentingnya fitur.
+    - Untuk prediksi baru, isi semua input sesuai data dan tekan tombol **Prediksi**.
+
+    *Versi saat ini menggunakan dataset bawaan dari sumber terpercaya dan tidak memungkinkan pengunggahan data pribadi.*
+    """)
+
+# Halaman 2: Informasi Dataset
+elif page == "📊 Informasi Dataset":
+    st.title("📊 Informasi Dataset Kepribadian")
+    
+    st.subheader("📄 Deskripsi Dataset")
     st.markdown("""
-Dataset ini berisi data kepribadian yang dikumpulkan dari individu berdasarkan karakteristik psikologis dan perilaku sosial mereka.  
-Terdiri dari atribut seperti: usia, jenis kelamin, sifat kepribadian (Big Five), perilaku sosial, dan aktivitas online.
-""")
-    st.dataframe(df.head())
+    Dataset ini berisi data hasil survei kepribadian berdasarkan lima dimensi besar psikologi (Big Five) dan beberapa kebiasaan sosial:
+    - Openness, Neuroticism, Conscientiousness, Agreeableness, Extraversion
+    - Umur, jenis kelamin, interaksi sosial, preferensi pribadi, ukuran lingkar sosial
 
-    st.markdown("### 📊 Deskripsi Statistik")
-    st.markdown("Berikut adalah ringkasan statistik dari seluruh fitur numerik dalam dataset:")
-    st.write(df.describe(include='all'))
+    Target variabel adalah tipe kepribadian seperti INTP, ESFJ, dll.
+    """)
 
-    st.markdown("### 📌 Distribusi Tipe Kepribadian")
-    st.markdown("Visualisasi ini menunjukkan seberapa banyak data masing-masing kelas kepribadian:")
-    fig1, ax1 = plt.subplots()
-    sns.countplot(data=df, x='Kepribadian', ax=ax1)
-    ax1.set_xticklabels(target_encoder.inverse_transform(sorted(df['Kepribadian'].unique())))
-    st.pyplot(fig1)
+    st.subheader("📊 Statistik Deskriptif")
+    st.dataframe(df.describe(include='all'))
 
-    st.markdown("### 🔗 Korelasi Antar Fitur")
-    st.markdown("""
-Heatmap berikut menunjukkan korelasi antar fitur numerik.  
-Nilai korelasi berkisar dari -1 (berlawanan) hingga 1 (sangat berhubungan). Korelasi tinggi dapat memengaruhi hasil model.
-""")
-    fig2, ax2 = plt.subplots()
-    sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
-    st.pyplot(fig2)
+    st.subheader("📈 Distribusi Tipe Kepribadian")
+    fig, ax = plt.subplots()
+    df['Personality'].value_counts().plot(kind='bar', ax=ax)
+    st.pyplot(fig)
 
-# ===================== Pemodelan =====================
-elif page == "📊 Pemodelan Data":
-    st.title("📊 Pemodelan Prediksi Kepribadian")
+    st.subheader("🔗 Korelasi Antar Fitur")
+    corr = df.select_dtypes(include=[np.number]).corr()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
+    st.pyplot(fig)
 
-    # Bersihkan NaN dan ∞
-    df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    for col in df.columns:
-        if df[col].isnull().sum() > 0:
-            if df[col].dtype in [np.float64, np.int64]:
-                df[col].fillna(df[col].median(), inplace=True)
-            else:
-                df[col].fillna(df[col].mode()[0], inplace=True)
-    st.success("✅ Nilai kosong/∞ telah diatasi.")
+# Halaman 3: Pemodelan Data
+elif page == "📈 Pemodelan Data":
+    st.title("📈 Pemodelan Kepribadian")
 
-    X = df.drop('Kepribadian', axis=1)
-    y = df['Kepribadian']
+    st.markdown("Silakan pilih model dan parameter yang akan digunakan untuk pelatihan.")
 
-    for col in X.columns:
-        if X[col].dtype == 'object':
-            le = LabelEncoder()
-            X[col] = le.fit_transform(X[col])
+    X = df.drop("Personality", axis=1)
+    y = df["Personality"]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    test_size = st.slider("Ukuran Data Uji (%)", 10, 50, 30)
+    random_state = st.number_input("Random State", value=42)
 
-    st.subheader("Pilih Model")
-    model_choice = st.selectbox("Model", ["Random Forest", "Logistic Regression"])
+    model_option = st.selectbox("Pilih Model", ["Random Forest", "Logistic Regression"])
+    
+    if st.button("Latih Model"):
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size/100, random_state=random_state)
 
-    if model_choice == "Random Forest":
-        n_estimators = st.slider("Jumlah Pohon", 10, 200, 100)
-        model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
-    else:
-        model = LogisticRegression(max_iter=500)
+        if model_option == "Random Forest":
+            model = RandomForestClassifier(random_state=random_state)
+        else:
+            model = LogisticRegression(max_iter=1000, random_state=random_state)
 
-    if st.button("🚀 Latih Model"):
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
-        st.session_state.model = model
-        st.session_state.X_columns = X.columns.tolist()
-        st.session_state.X_test = X_test
-        st.session_state.y_test = y_test
+        st.subheader("📄 Classification Report")
+        report = classification_report(y_test, y_pred, output_dict=True)
+        st.dataframe(pd.DataFrame(report).transpose())
 
-        acc = accuracy_score(y_test, y_pred)
-        st.metric("Akurasi Data Uji", f"{acc:.2f}")
-
-        with st.spinner("Melakukan Cross-Validation..."):
-            cv_scores = cross_val_score(model, X_train, y_train, cv=5)
-            st.metric("Akurasi Rata-rata (CV)", f"{cv_scores.mean():.2f}")
-
-        st.subheader("📋 Classification Report")
-        st.markdown("Laporan klasifikasi menunjukkan metrik precision, recall, dan f1-score dari masing-masing kelas kepribadian.")
-        st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)).transpose().style.format("{:.2f}"))
-
-        st.subheader("🧩 Confusion Matrix")
-        st.markdown("Confusion matrix membantu memvisualisasikan seberapa banyak prediksi yang benar atau salah pada tiap kelas.")
-        cm = confusion_matrix(y_test, y_pred)
-        fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                    xticklabels=target_encoder.classes_, 
-                    yticklabels=target_encoder.classes_,
-                    ax=ax)
-        ax.set_xlabel("Prediksi")
-        ax.set_ylabel("Aktual")
+        st.subheader("📉 Confusion Matrix")
+        cm = confusion_matrix(y_test, y_pred, labels=np.unique(y))
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=np.unique(y), yticklabels=np.unique(y), ax=ax)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
         st.pyplot(fig)
 
-        if model_choice == "Logistic Regression":
-            st.subheader("📌 Koefisien Fitur (Logistic Regression)")
-            st.markdown("Koefisien menunjukkan arah dan kekuatan pengaruh setiap fitur terhadap prediksi kelas.")
-            coef_df = pd.DataFrame(model.coef_, columns=X.columns)
-            st.write(coef_df)
+        if model_option == "Logistic Regression":
+            st.subheader("🔢 Koefisien Fitur")
+            coef_df = pd.DataFrame(model.coef_, columns=X.columns, index=model.classes_)
+            st.dataframe(coef_df)
 
-        if hasattr(model, 'feature_importances_'):
-            st.subheader("📌 Pentingnya Fitur")
-            st.markdown("Fitur yang lebih penting memiliki kontribusi lebih besar dalam keputusan model.")
-            importances = model.feature_importances_
-            imp_df = pd.DataFrame({'Fitur': X.columns, 'Penting': importances})
+        elif model_option == "Random Forest":
+            st.subheader("🌲 Pentingnya Fitur")
+            importance = pd.Series(model.feature_importances_, index=X.columns)
             fig2, ax2 = plt.subplots()
-            sns.barplot(x='Penting', y='Fitur', data=imp_df.sort_values(by='Penting', ascending=False), palette='viridis', ax=ax2)
+            importance.sort_values().plot(kind='barh', ax=ax2)
             st.pyplot(fig2)
 
-# ===================== Prediksi =====================
-elif page == "🔮 Prediksi":
-    st.title("🔮 Prediksi Tipe Kepribadian")
-    if st.session_state.model is None:
-        st.warning("Latih model terlebih dahulu di halaman Pemodelan.")
-    else:
-        input_data = {}
-        for col in df.columns:
-            if col != 'Kepribadian':
-                if df[col].dtype in [np.float64, np.int64]:
-                    input_data[col] = st.number_input(f"{col}", float(df[col].min()), float(df[col].max()), float(df[col].mean()))
-                else:
-                    input_data[col] = st.selectbox(f"{col}", sorted(df[col].dropna().unique()))
-        input_df = pd.DataFrame([input_data])
+# Halaman 4: Prediksi
+elif page == "🤔 Prediksi":
+    st.title("🤔 Prediksi Kepribadian")
 
-        for col in input_df.columns:
-            if input_df[col].dtype == 'object':
-                le = LabelEncoder()
-                le.fit(df[col])
-                input_df[col] = le.transform(input_df[col])
+    st.markdown("Masukkan data berikut untuk memprediksi tipe kepribadian seseorang.")
 
-        input_df = input_df[st.session_state.X_columns]
+    usia = st.slider("Usia", 12, 80, 25)
+    gender = st.radio("Jenis Kelamin", ["Laki-laki", "Perempuan"])
+    jk = 1 if gender == "Laki-laki" else 0
 
-        if st.button("Prediksi"):
-            pred = st.session_state.model.predict(input_df)[0]
-            prob = st.session_state.model.predict_proba(input_df)[0]
-            label = target_encoder.inverse_transform([pred])[0]
-            st.success(f"🧬 Tipe Kepribadian yang Diprediksi: {label}")
-            st.markdown("Berikut adalah probabilitas model terhadap semua kemungkinan tipe kepribadian:")
-            st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
-            st.markdown("""
-💡 Interpretasi:
-- Tipe kepribadian yang memiliki probabilitas tertinggi adalah hasil akhir prediksi.
-- Nilai probabilitas menunjukkan tingkat keyakinan model terhadap prediksi tersebut.
-""")
+    openness = st.slider("Openness", 1.0, 5.0, 3.0)
+    neuroticism = st.slider("Neuroticism", 1.0, 5.0, 3.0)
+    conscientiousness = st.slider("Conscientiousness", 1.0, 5.0, 3.0)
+    agreeableness = st.slider("Agreeableness", 1.0, 5.0, 3.0)
+    extraversion = st.slider("Extraversion", 1.0, 5.0, 3.0)
 
-# ===================== Anggota =====================
-elif page == "👥 Anggota Kelompok":
-    st.title("👥 Anggota Kelompok")
-    st.markdown("""
-- 👩‍🏫 Diva Auliya Pusparini (2304030041)  
-- 👩‍🎓 Paskalia Kanicha Mardian (2304030062)  
-- 👨‍💻 Sandi Krisna Mukti (2304030074)  
-- 👩‍⚕️ Siti Maisyaroh (2304030079)
-""")
+    waktu_sendiri = st.slider("Waktu Sendiri (jam/hari)", 0, 24, 4)
+    keluar_rumah = st.slider("Frekuensi Keluar Rumah (per minggu)", 0, 14, 3)
+    lelah_sosialisasi = st.slider("Merasa Lelah Setelah Bersosialisasi (1–5)", 1, 5, 3)
+    takut_panggung = st.slider("Takut Berbicara di Depan Umum (1–5)", 1, 5, 3)
+    postingan = st.slider("Frekuensi Membuat Postingan (per minggu)", 0, 14, 2)
+    lingkaran = st.slider("Ukuran Lingkaran Pertemanan", 0, 100, 10)
+
+    input_data = pd.DataFrame([[usia, jk, openness, neuroticism, conscientiousness, agreeableness,
+                                extraversion, waktu_sendiri, keluar_rumah, lelah_sosialisasi,
+                                takut_panggung, postingan, lingkaran]],
+                              columns=['Usia', 'Jenis Kelamin', 'Openness', 'Neuroticism',
+                                       'Conscientiousness', 'Agreeableness', 'Extraversion',
+                                       'Waktu Sendiri', 'Frekuensi Keluar Rumah',
+                                       'Merasa Lelah Setelah Bersosialisasi',
+                                       'Takut Panggung', 'Frekuensi Membuat Postingan',
+                                       'Ukuran Lingkaran Pertemanan'])
+
+    if st.button("Prediksi"):
+        model = RandomForestClassifier().fit(df.drop("Personality", axis=1), df["Personality"])
+        hasil = model.predict(input_data)[0]
+        st.success(f"Tipe Kepribadian yang Diprediksi: {hasil}")
+
+        st.markdown("""
+        Tipe kepribadian ini diprediksi berdasarkan pola data yang Anda masukkan.
+        Jika Anda ingin hasil lebih akurat, silakan masukkan data yang lengkap dan representatif.
+        """)
+
+# Halaman tambahan dummy
+elif page == "👥 Anggota":
+    st.title("👥 Anggota")
+    st.markdown("Aplikasi ini dikembangkan oleh tim ...")
+
+elif page == "🧩 Kelompok":
+    st.title("🧩 Kelompok")
+    st.markdown("Bagian ini menjelaskan pembagian kelompok kepribadian berdasarkan teori MBTI.")
