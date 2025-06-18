@@ -58,41 +58,15 @@ if page == "📖 Panduan":
     st.title("📖 Panduan Penggunaan Aplikasi Prediksi Kepribadian")
     st.markdown("""
     Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis.
-
-    #### ✨ Fitur yang Digunakan:
-    - **Usia**: Umur responden.
-    - **Jenis Kelamin**: Laki-laki atau perempuan.
-    - **Keterbukaan (Openness)**, **Neurotisisme**, **Kehati-hatian (Conscientiousness)**, **Sifat Mudah Setuju**, **Ekstraversi**
-    - **Waktu Sendiri**, **Frekuensi Keluar Rumah**, **Merasa Lelah Setelah Bersosialisasi**: Indikator preferensi sosial.
-    - **Takut Panggung**, **Frekuensi Membuat Postingan**, **Ukuran Lingkaran Pertemanan**: Ciri sosial lainnya.
-
-    #### 🧠 Tentang Pemodelan:
-    - **Random Forest**: Model ensemble berbasis pohon keputusan, andal dan mampu menangani banyak fitur.
-    - **Logistic Regression**: Model linier untuk klasifikasi multiklas, berguna untuk interpretasi fitur.
-
-    #### 📋 Saran Penggunaan:
-    - Pastikan Anda telah memilih model dan mengatur parameter sebelum menekan tombol **Latih Model**.
-    - Anda bisa melihat performa model melalui akurasi, confusion matrix, dan pentingnya fitur.
-    - Untuk prediksi baru, isi semua input sesuai data dan tekan tombol **Prediksi**.
-
-    *Versi saat ini menggunakan dataset bawaan dari sumber terpercaya dan tidak memungkinkan pengunggahan data baru.*
+    ...
     """)
 
 # ============================ PETUNJUK ============================
 elif page == "📌 Petunjuk Penggunaan":
     st.title("📌 Petunjuk Penggunaan Aplikasi")
     st.markdown("""
-    Selamat datang di aplikasi prediksi tipe kepribadian!
-    
     Berikut adalah langkah-langkah menggunakan aplikasi ini:
-    
-    1. Buka halaman 📘 Informasi Dataset untuk melihat isi dan statistik dataset.
-    2. Masuk ke halaman 📊 Pemodelan Data untuk memilih dan melatih model prediksi.
-    3. Setelah model dilatih, gunakan halaman 🔮 Prediksi untuk mengisi data dan melihat hasil prediksi.
-    
-    📢 Catatan:
-    - Dataset yang digunakan adalah dataset tetap yang telah disediakan.
-    - Gunakan model Random Forest atau Logistic Regression untuk prediksi.
+    ...
     """)
 
 # ============================ INFORMASI ============================
@@ -130,6 +104,25 @@ elif page == "📊 Pemodelan Data":
             le = LabelEncoder()
             X[col] = le.fit_transform(X[col])
 
+    st.subheader("🔍 Validasi Data")
+    if st.button("🔍 Cek Validitas Data"):
+        nan_X = X.isnull().sum()
+        nan_y = y.isnull().sum()
+        inf_X = np.isinf(X).sum()
+        inf_y = np.isinf(y).sum()
+
+        if nan_X.sum() > 0 or nan_y > 0:
+            st.error("❗ Ditemukan nilai kosong (NaN) dalam data.")
+            st.write("Detail NaN di fitur (X):")
+            st.write(nan_X[nan_X > 0])
+            if nan_y > 0:
+                st.write("Jumlah NaN di target (y):", nan_y)
+        elif inf_X.sum() > 0 or inf_y > 0:
+            st.error("❗ Ditemukan nilai tak hingga (∞) dalam data.")
+            st.write("Jumlah ∞ di fitur (X):", inf_X[inf_X > 0])
+        else:
+            st.success("✅ Tidak ditemukan NaN atau ∞. Data aman untuk proses pelatihan.")
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     st.subheader("Pilih Model dan Parameter")
@@ -142,59 +135,65 @@ elif page == "📊 Pemodelan Data":
         model = LogisticRegression(max_iter=500)
 
     if st.button("🚀 Latih Model"):
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
+        if (
+            np.any(np.isnan(X_train)) or np.any(np.isnan(y_train)) or
+            np.any(np.isinf(X_train)) or np.any(np.isinf(y_train))
+        ):
+            st.error("❌ Data pelatihan mengandung NaN atau ∞. Harap bersihkan data sebelum melatih model.")
+        else:
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
 
-        acc = accuracy_score(y_test, y_pred)
-        report = classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)
+            acc = accuracy_score(y_test, y_pred)
+            report = classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)
 
-        st.session_state.model = model
-        st.session_state.X_columns = X.columns.tolist()
-        st.session_state.X_test = X_test
-        st.session_state.y_test = y_test
+            st.session_state.model = model
+            st.session_state.X_columns = X.columns.tolist()
+            st.session_state.X_test = X_test
+            st.session_state.y_test = y_test
 
-        st.metric("Akurasi Data Uji", f"{acc:.2f}")
+            st.metric("Akurasi Data Uji", f"{acc:.2f}")
 
-        with st.spinner("Melakukan Cross-Validation..."):
-            cv_scores = cross_val_score(model, X_train, y_train, cv=5)
-            st.metric("Cross-Validation Akurasi (rata-rata)", f"{cv_scores.mean():.2f}")
-            st.write("Akurasi per Fold:", [f"{score:.2f}" for score in cv_scores])
+            with st.spinner("Melakukan Cross-Validation..."):
+                cv_scores = cross_val_score(model, X_train, y_train, cv=5)
+                st.metric("Cross-Validation Akurasi (rata-rata)", f"{cv_scores.mean():.2f}")
+                st.write("Akurasi per Fold:", [f"{score:.2f}" for score in cv_scores])
 
-        st.subheader("📋 Classification Report")
-        st.dataframe(pd.DataFrame(report).transpose().style.format("{:.2f}"))
+            st.subheader("📋 Classification Report")
+            st.dataframe(pd.DataFrame(report).transpose().style.format("{:.2f}"))
 
-        st.subheader("🧩 Confusion Matrix")
-        cm = confusion_matrix(y_test, y_pred)
-        fig_cm, ax_cm = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                    xticklabels=target_encoder.classes_,
-                    yticklabels=target_encoder.classes_,
-                    ax=ax_cm)
-        ax_cm.set_xlabel('Prediksi')
-        ax_cm.set_ylabel('Aktual')
-        st.pyplot(fig_cm)
+            st.subheader("🧩 Confusion Matrix")
+            cm = confusion_matrix(y_test, y_pred)
+            fig_cm, ax_cm = plt.subplots()
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=target_encoder.classes_,
+                        yticklabels=target_encoder.classes_,
+                        ax=ax_cm)
+            ax_cm.set_xlabel('Prediksi')
+            ax_cm.set_ylabel('Aktual')
+            st.pyplot(fig_cm)
 
-        if hasattr(model, 'feature_importances_'):
-            st.subheader("📌 Pentingnya Fitur")
-            importance = model.feature_importances_
-            imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance})
-            fig_imp, ax_imp = plt.subplots()
-            sns.barplot(x='Pentingnya', y='Fitur', data=imp_df.sort_values(by='Pentingnya', ascending=False), palette='viridis', ax=ax_imp)
-            st.pyplot(fig_imp)
+            if hasattr(model, 'feature_importances_'):
+                st.subheader("📌 Pentingnya Fitur")
+                importance = model.feature_importances_
+                imp_df = pd.DataFrame({'Fitur': X.columns, 'Pentingnya': importance})
+                fig_imp, ax_imp = plt.subplots()
+                sns.barplot(x='Pentingnya', y='Fitur', data=imp_df.sort_values(by='Pentingnya', ascending=False), palette='viridis', ax=ax_imp)
+                st.pyplot(fig_imp)
 
-        if len(target_encoder.classes_) == 2:
-            st.subheader("🚦 ROC Curve")
-            y_prob = model.predict_proba(X_test)[:, 1]
-            fpr, tpr, _ = roc_curve(y_test, y_prob)
-            roc_auc = auc(fpr, tpr)
-            fig_roc, ax3 = plt.subplots()
-            ax3.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
-            ax3.plot([0, 1], [0, 1], linestyle='--', color='gray')
-            ax3.set_title("ROC Curve")
-            ax3.set_xlabel("False Positive Rate")
-            ax3.set_ylabel("True Positive Rate")
-            ax3.legend()
-            st.pyplot(fig_roc)
+            if len(target_encoder.classes_) == 2:
+                st.subheader("🚦 ROC Curve")
+                y_prob = model.predict_proba(X_test)[:, 1]
+                fpr, tpr, _ = roc_curve(y_test, y_prob)
+                roc_auc = auc(fpr, tpr)
+                fig_roc, ax3 = plt.subplots()
+                ax3.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
+                ax3.plot([0, 1], [0, 1], linestyle='--', color='gray')
+                ax3.set_title("ROC Curve")
+                ax3.set_xlabel("False Positive Rate")
+                ax3.set_ylabel("True Positive Rate")
+                ax3.legend()
+                st.pyplot(fig_roc)
 
 # ============================ PREDIKSI ============================
 elif page == "🔮 Prediksi":
