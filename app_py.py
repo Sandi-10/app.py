@@ -28,7 +28,7 @@ df.rename(columns={
     'Stage_fear': 'Takut_Panggung',
     'Social_event_attendance': 'Frekuensi Menghadiri Acara Sosial',
     'Going_outside': 'Frekuensi Keluar Rumah',
-    'Drained_after_socializing: 'Merasa Lelah Setelah Bersosialisasi',
+    'Drained_after_socializing': 'Merasa Lelah Setelah Bersosialisasi',
     'Friends_circle_size': 'Ukuran Lingkaran Pertemanan',
     'Post_frequency': 'Frekuensi Membuat Postingan',
 }, inplace=True)
