@@ -15,7 +15,7 @@ st.set_page_config(page_title="Prediksi Kepribadian", layout="wide")
 st.sidebar.image("https://img.icons8.com/ios-filled/100/psychology.png", width=80)
 st.sidebar.title("🧠 Aplikasi Prediksi Kepribadian")
 
-# ===================== Load Data =====================
+# ===================== Load Dataset =====================
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
@@ -36,6 +36,7 @@ df.rename(columns={
     'Post_frequency': 'Frekuensi Membuat Postingan',
 }, inplace=True)
 
+# Encode target
 target_encoder = LabelEncoder()
 df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
@@ -48,16 +49,16 @@ for key in ['model', 'X_columns', 'X_test', 'y_test']:
 # ===================== Navigasi =====================
 page = st.sidebar.radio("Pilih Halaman", [
     "📖 Panduan",
-    "📘 Informasi Dataset", 
-    "📊 Pemodelan Data", 
-    "🔮 Prediksi", 
+    "📘 Informasi Dataset",
+    "📊 Pemodelan Data",
+    "🔮 Prediksi",
     "👥 Anggota Kelompok"
 ])
 
 # ===================== Panduan =====================
 if page == "📖 Panduan":
-    st.title("📖 Panduan Penggunaan Aplikasi Prediksi Kepribadian")
-    st.markdown("""
+    st.title("📖 Panduan Penggunaan Aplikasi")
+   st.markdown("""
 Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis dan sosial yang dimilikinya.
 
 #### ✨ Fitur yang Digunakan:
@@ -82,18 +83,30 @@ Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan 
 # ===================== Informasi Dataset =====================
 elif page == "📘 Informasi Dataset":
     st.title("📘 Informasi Dataset Kepribadian")
+
+    st.markdown("### ℹ️ Informasi Dataset")
+    st.markdown("""
+Dataset ini berisi data kepribadian yang dikumpulkan dari individu berdasarkan karakteristik psikologis dan perilaku sosial mereka.  
+Terdiri dari atribut seperti: usia, jenis kelamin, sifat kepribadian (Big Five), perilaku sosial, dan aktivitas online.
+""")
     st.dataframe(df.head())
 
-    st.subheader("Deskripsi Statistik")
+    st.markdown("### 📊 Deskripsi Statistik")
+    st.markdown("Berikut adalah ringkasan statistik dari seluruh fitur numerik dalam dataset:")
     st.write(df.describe(include='all'))
 
-    st.subheader("Distribusi Tipe Kepribadian")
+    st.markdown("### 📌 Distribusi Tipe Kepribadian")
+    st.markdown("Visualisasi ini menunjukkan seberapa banyak data masing-masing kelas kepribadian:")
     fig1, ax1 = plt.subplots()
     sns.countplot(data=df, x='Kepribadian', ax=ax1)
     ax1.set_xticklabels(target_encoder.inverse_transform(sorted(df['Kepribadian'].unique())))
     st.pyplot(fig1)
 
-    st.subheader("Korelasi Antar Fitur")
+    st.markdown("### 🔗 Korelasi Antar Fitur")
+    st.markdown("""
+Heatmap berikut menunjukkan korelasi antar fitur numerik.  
+Nilai korelasi berkisar dari -1 (berlawanan) hingga 1 (sangat berhubungan). Korelasi tinggi dapat memengaruhi hasil model.
+""")
     fig2, ax2 = plt.subplots()
     sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
@@ -102,17 +115,15 @@ elif page == "📘 Informasi Dataset":
 elif page == "📊 Pemodelan Data":
     st.title("📊 Pemodelan Prediksi Kepribadian")
 
+    # Bersihkan NaN dan ∞
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    if df.isnull().sum().sum() > 0:
-        for col in df.columns:
-            if df[col].isnull().sum() > 0:
-                if df[col].dtype in [np.float64, np.int64]:
-                    df[col].fillna(df[col].median(), inplace=True)
-                else:
-                    df[col].fillna(df[col].mode()[0], inplace=True)
-        st.success("✅ Nilai kosong/∞ berhasil diimputasi.")
-    else:
-        st.success("✅ Tidak ada nilai kosong/∞.")
+    for col in df.columns:
+        if df[col].isnull().sum() > 0:
+            if df[col].dtype in [np.float64, np.int64]:
+                df[col].fillna(df[col].median(), inplace=True)
+            else:
+                df[col].fillna(df[col].mode()[0], inplace=True)
+    st.success("✅ Nilai kosong/∞ telah diatasi.")
 
     X = df.drop('Kepribadian', axis=1)
     y = df['Kepribadian']
@@ -150,36 +161,35 @@ elif page == "📊 Pemodelan Data":
             st.metric("Akurasi Rata-rata (CV)", f"{cv_scores.mean():.2f}")
 
         st.subheader("📋 Classification Report")
+        st.markdown("Laporan klasifikasi menunjukkan metrik precision, recall, dan f1-score dari masing-masing kelas kepribadian.")
         st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, target_names=target_encoder.classes_, output_dict=True)).transpose().style.format("{:.2f}"))
 
         st.subheader("🧩 Confusion Matrix")
+        st.markdown("Confusion matrix membantu memvisualisasikan seberapa banyak prediksi yang benar atau salah pada tiap kelas.")
         cm = confusion_matrix(y_test, y_pred)
         fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                    xticklabels=target_encoder.classes_,
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                    xticklabels=target_encoder.classes_, 
                     yticklabels=target_encoder.classes_,
                     ax=ax)
         ax.set_xlabel("Prediksi")
         ax.set_ylabel("Aktual")
         st.pyplot(fig)
 
+        if model_choice == "Logistic Regression":
+            st.subheader("📌 Koefisien Fitur (Logistic Regression)")
+            st.markdown("Koefisien menunjukkan arah dan kekuatan pengaruh setiap fitur terhadap prediksi kelas.")
+            coef_df = pd.DataFrame(model.coef_, columns=X.columns)
+            st.write(coef_df)
+
         if hasattr(model, 'feature_importances_'):
             st.subheader("📌 Pentingnya Fitur")
+            st.markdown("Fitur yang lebih penting memiliki kontribusi lebih besar dalam keputusan model.")
             importances = model.feature_importances_
             imp_df = pd.DataFrame({'Fitur': X.columns, 'Penting': importances})
             fig2, ax2 = plt.subplots()
             sns.barplot(x='Penting', y='Fitur', data=imp_df.sort_values(by='Penting', ascending=False), palette='viridis', ax=ax2)
             st.pyplot(fig2)
-
-        if isinstance(model, LogisticRegression):
-            st.subheader("📉 Koefisien Fitur (Logistic Regression)")
-            coef_df = pd.DataFrame({
-                'Fitur': X.columns,
-                'Koefisien': model.coef_[0]
-            }).sort_values(by='Koefisien', ascending=False)
-            fig3, ax3 = plt.subplots()
-            sns.barplot(x='Koefisien', y='Fitur', data=coef_df, palette='coolwarm', ax=ax3)
-            st.pyplot(fig3)
 
 # ===================== Prediksi =====================
 elif page == "🔮 Prediksi":
@@ -208,9 +218,14 @@ elif page == "🔮 Prediksi":
             pred = st.session_state.model.predict(input_df)[0]
             prob = st.session_state.model.predict_proba(input_df)[0]
             label = target_encoder.inverse_transform([pred])[0]
-            st.success(f"Tipe Kepribadian yang Diprediksi: {label}")
-            st.subheader("Probabilitas")
+            st.success(f"🧬 Tipe Kepribadian yang Diprediksi: {label}")
+            st.markdown("Berikut adalah probabilitas model terhadap semua kemungkinan tipe kepribadian:")
             st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
+            st.markdown("""
+💡 Interpretasi:
+- Tipe kepribadian yang memiliki probabilitas tertinggi adalah hasil akhir prediksi.
+- Nilai probabilitas menunjukkan tingkat keyakinan model terhadap prediksi tersebut.
+""")
 
 # ===================== Anggota =====================
 elif page == "👥 Anggota Kelompok":
@@ -219,5 +234,6 @@ elif page == "👥 Anggota Kelompok":
 - 👩‍🏫 Diva Auliya Pusparini (2304030041)  
 - 👩‍🎓 Paskalia Kanicha Mardian (2304030062)  
 - 👨‍💻 Sandi Krisna Mukti (2304030074)  
-- 👩‍⚕ Siti Maisyaroh (2304030079)
+- 👩‍⚕️ Siti Maisyaroh (2304030079)
 """)
+kodenya ini
