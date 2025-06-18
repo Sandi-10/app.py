@@ -19,6 +19,7 @@ st.sidebar.title("🧠 Aplikasi Prediksi Kepribadian")
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
+# Rename kolom ke Bahasa Indonesia
 df.rename(columns={
     'Age': 'Usia',
     'Gender': 'Jenis_Kelamin',
@@ -36,6 +37,7 @@ df.rename(columns={
     'Post_frequency': 'Frekuensi Membuat Postingan',
 }, inplace=True)
 
+# Encode target
 target_encoder = LabelEncoder()
 df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
@@ -54,18 +56,40 @@ page = st.sidebar.radio("Pilih Halaman", [
     "👥 Anggota Kelompok"
 ])
 
-# ===================== Panduan =====================
+# ===================== Halaman Panduan =====================
 if page == "📖 Panduan":
-    st.title("📖 Panduan Penggunaan Aplikasi")
+    st.title("📖 Panduan Penggunaan Aplikasi Prediksi Kepribadian")
     st.markdown("""
-Aplikasi ini memanfaatkan pembelajaran mesin untuk memprediksi tipe kepribadian berdasarkan data psikologis pengguna.  
-Langkah-langkah penggunaan:
-1. Pelajari informasi dataset.
-2. Lakukan pelatihan model pada halaman Pemodelan Data.
-3. Masukkan data baru pada halaman Prediksi untuk melihat hasil prediksi.
+Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis dan perilaku sosial menggunakan pembelajaran mesin.
+
+---
+
+#### ✨ Fitur yang Digunakan:
+- **Usia**: Umur responden.
+- **Jenis Kelamin**: Laki-laki atau perempuan.
+- **Keterbukaan (Openness)**, **Neurotisisme**, **Kehati-hatian (Conscientiousness)**, **Sifat Mudah Setuju (Agreeableness)**, **Ekstraversi**: Lima dimensi utama kepribadian berdasarkan model Big Five.
+- **Waktu Sendiri**, **Frekuensi Keluar Rumah**, **Merasa Lelah Setelah Bersosialisasi**: Indikator aktivitas dan preferensi sosial.
+- **Takut Panggung**, **Frekuensi Membuat Postingan**, **Ukuran Lingkaran Pertemanan**: Ciri sosial dan interaksi online.
+
+---
+
+#### 🧠 Tentang Pemodelan:
+- **Random Forest**: Model ensemble berbasis pohon keputusan, andal dan mampu menangani banyak fitur tanpa perlu normalisasi.
+- **Logistic Regression**: Model linier untuk klasifikasi multiklas, berguna untuk interpretasi koefisien fitur.
+
+---
+
+#### 🛠️ Saran Penggunaan:
+- Pastikan Anda telah memilih model dan mengatur parameter sebelum menekan tombol **Latih Model**.
+- Anda bisa melihat performa model melalui akurasi, confusion matrix, dan pentingnya fitur.
+- Untuk prediksi baru, isi semua input sesuai data dan tekan tombol **Prediksi**.
+
+---
+
+📌 Versi saat ini menggunakan dataset bawaan dari sumber terpercaya dan tidak memungkinkan pengunggahan data eksternal secara langsung.
 """)
 
-# ===================== Informasi Dataset =====================
+# ===================== Halaman Dataset =====================
 elif page == "📘 Informasi Dataset":
     st.title("📘 Informasi Dataset Kepribadian")
     st.dataframe(df.head())
@@ -80,14 +104,15 @@ elif page == "📘 Informasi Dataset":
     st.pyplot(fig1)
 
     st.subheader("Korelasi Antar Fitur")
-    fig2, ax2 = plt.subplots(figsize=(12, 10))
+    fig2, ax2 = plt.subplots()
     sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
 
-# ===================== Pemodelan =====================
+# ===================== Halaman Pemodelan =====================
 elif page == "📊 Pemodelan Data":
     st.title("📊 Pemodelan Prediksi Kepribadian")
 
+    # Bersihkan NaN dan ∞
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     if df.isnull().sum().sum() > 0:
         for col in df.columns:
@@ -157,7 +182,7 @@ elif page == "📊 Pemodelan Data":
             sns.barplot(x='Penting', y='Fitur', data=imp_df.sort_values(by='Penting', ascending=False), palette='viridis', ax=ax2)
             st.pyplot(fig2)
 
-# ===================== Prediksi =====================
+# ===================== Halaman Prediksi =====================
 elif page == "🔮 Prediksi":
     st.title("🔮 Prediksi Tipe Kepribadian")
     if st.session_state.model is None:
@@ -188,7 +213,7 @@ elif page == "🔮 Prediksi":
             st.subheader("Probabilitas")
             st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
 
-# ===================== Anggota =====================
+# ===================== Halaman Anggota =====================
 elif page == "👥 Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
     st.markdown("""
