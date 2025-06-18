@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 
 # ===================== Informasi Aplikasi =====================
 st.set_page_config(page_title="Prediksi Kepribadian", layout="wide")
@@ -19,7 +19,6 @@ st.sidebar.title("🧠 Aplikasi Prediksi Kepribadian")
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
-# Rename kolom ke Bahasa Indonesia
 df.rename(columns={
     'Age': 'Usia',
     'Gender': 'Jenis_Kelamin',
@@ -37,7 +36,6 @@ df.rename(columns={
     'Post_frequency': 'Frekuensi Membuat Postingan',
 }, inplace=True)
 
-# Encode target
 target_encoder = LabelEncoder()
 df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
@@ -60,11 +58,11 @@ page = st.sidebar.radio("Pilih Halaman", [
 if page == "📖 Panduan":
     st.title("📖 Panduan Penggunaan Aplikasi")
     st.markdown("""
-Aplikasi ini menggunakan pembelajaran mesin untuk memprediksi tipe kepribadian seseorang berdasarkan data psikologis.  
-Langkah-langkah penggunaannya:
-1. Tinjau informasi dataset.
-2. Latih model di halaman Pemodelan Data.
-3. Lakukan prediksi dengan input baru di halaman Prediksi.
+Aplikasi ini memanfaatkan pembelajaran mesin untuk memprediksi tipe kepribadian berdasarkan data psikologis pengguna.  
+Langkah-langkah penggunaan:
+1. Pelajari informasi dataset.
+2. Lakukan pelatihan model pada halaman Pemodelan Data.
+3. Masukkan data baru pada halaman Prediksi untuk melihat hasil prediksi.
 """)
 
 # ===================== Informasi Dataset =====================
@@ -82,7 +80,7 @@ elif page == "📘 Informasi Dataset":
     st.pyplot(fig1)
 
     st.subheader("Korelasi Antar Fitur")
-    fig2, ax2 = plt.subplots()
+    fig2, ax2 = plt.subplots(figsize=(12, 10))
     sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
 
@@ -90,7 +88,6 @@ elif page == "📘 Informasi Dataset":
 elif page == "📊 Pemodelan Data":
     st.title("📊 Pemodelan Prediksi Kepribadian")
 
-    # Bersihkan NaN dan ∞
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     if df.isnull().sum().sum() > 0:
         for col in df.columns:
