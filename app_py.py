@@ -19,7 +19,6 @@ st.sidebar.title("🧠 Aplikasi Prediksi Kepribadian")
 url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
 df = pd.read_csv(url)
 
-# Rename kolom ke Bahasa Indonesia
 df.rename(columns={
     'Age': 'Usia',
     'Gender': 'Jenis_Kelamin',
@@ -37,7 +36,6 @@ df.rename(columns={
     'Post_frequency': 'Frekuensi Membuat Postingan',
 }, inplace=True)
 
-# Encode target
 target_encoder = LabelEncoder()
 df['Kepribadian'] = target_encoder.fit_transform(df['Personality'])
 df.drop(columns=['Personality'], inplace=True)
@@ -56,40 +54,33 @@ page = st.sidebar.radio("Pilih Halaman", [
     "👥 Anggota Kelompok"
 ])
 
-# ===================== Halaman Panduan =====================
+# ===================== Panduan =====================
 if page == "📖 Panduan":
     st.title("📖 Panduan Penggunaan Aplikasi Prediksi Kepribadian")
-    st.markdown("""
-Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis dan perilaku sosial menggunakan pembelajaran mesin.
 
----
+    st.markdown("""
+Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis dan sosial yang dimilikinya.
 
 #### ✨ Fitur yang Digunakan:
 - **Usia**: Umur responden.
 - **Jenis Kelamin**: Laki-laki atau perempuan.
-- **Keterbukaan (Openness)**, **Neurotisisme**, **Kehati-hatian (Conscientiousness)**, **Sifat Mudah Setuju (Agreeableness)**, **Ekstraversi**: Lima dimensi utama kepribadian berdasarkan model Big Five.
-- **Waktu Sendiri**, **Frekuensi Keluar Rumah**, **Merasa Lelah Setelah Bersosialisasi**: Indikator aktivitas dan preferensi sosial.
-- **Takut Panggung**, **Frekuensi Membuat Postingan**, **Ukuran Lingkaran Pertemanan**: Ciri sosial dan interaksi online.
-
----
+- **Keterbukaan (Openness)**, **Neurotisisme**, **Kehati-hatian (Conscientiousness)**, **Sifat Mudah Setuju (Agreeableness)**, **Ekstraversi**: Lima dimensi kepribadian utama.
+- **Waktu Sendiri**, **Frekuensi Keluar Rumah**, **Merasa Lelah Setelah Bersosialisasi**: Indikator preferensi sosial.
+- **Takut Panggung**, **Frekuensi Membuat Postingan**, **Ukuran Lingkaran Pertemanan**: Ciri sosial lainnya.
 
 #### 🧠 Tentang Pemodelan:
-- **Random Forest**: Model ensemble berbasis pohon keputusan, andal dan mampu menangani banyak fitur tanpa perlu normalisasi.
-- **Logistic Regression**: Model linier untuk klasifikasi multiklas, berguna untuk interpretasi koefisien fitur.
+- **Random Forest**: Model ensemble berbasis pohon keputusan, andal dan mampu menangani banyak fitur sekaligus.
+- **Logistic Regression**: Model linier untuk klasifikasi multiklas, berguna untuk interpretasi bobot/koefisien fitur.
 
----
-
-#### 🛠️ Saran Penggunaan:
+#### 🧾 Saran Penggunaan:
 - Pastikan Anda telah memilih model dan mengatur parameter sebelum menekan tombol **Latih Model**.
 - Anda bisa melihat performa model melalui akurasi, confusion matrix, dan pentingnya fitur.
 - Untuk prediksi baru, isi semua input sesuai data dan tekan tombol **Prediksi**.
 
----
-
-📌 Versi saat ini menggunakan dataset bawaan dari sumber terpercaya dan tidak memungkinkan pengunggahan data eksternal secara langsung.
+> Versi saat ini menggunakan dataset bawaan dari sumber terpercaya dan tidak memungkinkan pengunggahan data eksternal.
 """)
 
-# ===================== Halaman Dataset =====================
+# ===================== Informasi Dataset =====================
 elif page == "📘 Informasi Dataset":
     st.title("📘 Informasi Dataset Kepribadian")
     st.dataframe(df.head())
@@ -108,11 +99,10 @@ elif page == "📘 Informasi Dataset":
     sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm', ax=ax2)
     st.pyplot(fig2)
 
-# ===================== Halaman Pemodelan =====================
+# ===================== Pemodelan =====================
 elif page == "📊 Pemodelan Data":
     st.title("📊 Pemodelan Prediksi Kepribadian")
 
-    # Bersihkan NaN dan ∞
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
     if df.isnull().sum().sum() > 0:
         for col in df.columns:
@@ -166,8 +156,8 @@ elif page == "📊 Pemodelan Data":
         st.subheader("🧩 Confusion Matrix")
         cm = confusion_matrix(y_test, y_pred)
         fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                    xticklabels=target_encoder.classes_, 
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=target_encoder.classes_,
                     yticklabels=target_encoder.classes_,
                     ax=ax)
         ax.set_xlabel("Prediksi")
@@ -182,7 +172,17 @@ elif page == "📊 Pemodelan Data":
             sns.barplot(x='Penting', y='Fitur', data=imp_df.sort_values(by='Penting', ascending=False), palette='viridis', ax=ax2)
             st.pyplot(fig2)
 
-# ===================== Halaman Prediksi =====================
+        if isinstance(model, LogisticRegression):
+            st.subheader("📉 Koefisien Fitur (Logistic Regression)")
+            coef_df = pd.DataFrame({
+                'Fitur': X.columns,
+                'Koefisien': model.coef_[0]
+            }).sort_values(by='Koefisien', ascending=False)
+            fig3, ax3 = plt.subplots()
+            sns.barplot(x='Koefisien', y='Fitur', data=coef_df, palette='coolwarm', ax=ax3)
+            st.pyplot(fig3)
+
+# ===================== Prediksi =====================
 elif page == "🔮 Prediksi":
     st.title("🔮 Prediksi Tipe Kepribadian")
     if st.session_state.model is None:
@@ -213,7 +213,7 @@ elif page == "🔮 Prediksi":
             st.subheader("Probabilitas")
             st.bar_chart(pd.Series(prob, index=target_encoder.classes_))
 
-# ===================== Halaman Anggota =====================
+# ===================== Anggota =====================
 elif page == "👥 Anggota Kelompok":
     st.title("👥 Anggota Kelompok")
     st.markdown("""
