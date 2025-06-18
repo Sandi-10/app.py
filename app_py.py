@@ -58,7 +58,7 @@ page = st.sidebar.radio("Pilih Halaman", [
 # ===================== Panduan =====================
 if page == "📖 Panduan":
     st.title("📖 Panduan Penggunaan Aplikasi")
-   st.markdown("""
+    st.markdown("""
 Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan fitur psikologis dan sosial yang dimilikinya.
 
 #### ✨ Fitur yang Digunakan:
