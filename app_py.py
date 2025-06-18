@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import base64
 from PIL import Image
 
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
@@ -14,11 +13,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
 # ==================== Fungsi Tambahan ====================
-def get_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
-
 def encode_input(df_input, df_ref):
     df_encoded = df_input.copy()
     for col in df_input.columns:
@@ -45,21 +39,6 @@ for col in X.select_dtypes(include='object').columns:
     X[col] = le.fit_transform(X[col])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# ==================== Streamlit Setup ====================
-bg_image = get_base64("a14f21d8-501c-4e9f-86d7-79e649c615c8.jpg")
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{bg_image}");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-    }}
-    </style>
-    """, unsafe_allow_html=True
-)
 
 # ==================== Navigasi Halaman ====================
 st.sidebar.title("Navigasi")
