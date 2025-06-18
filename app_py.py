@@ -10,13 +10,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
-# Load Data
-uploaded = st.file_uploader("Unggah dataset (CSV)", type="csv")
-if uploaded is not None:
-    df = pd.read_csv(uploaded)
-else:
-    url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
-    df = pd.read_csv(url)
+# ===================== Load Data =====================
+url = 'https://raw.githubusercontent.com/Sandi-10/Personality/main/personality_dataset.csv'
+df = pd.read_csv(url)
 
 # Rename kolom ke Bahasa Indonesia
 df.rename(columns={
@@ -69,7 +65,7 @@ if page == "📌 Petunjuk Penggunaan":
     3. Setelah model dilatih, gunakan halaman 🔮 Prediksi untuk mengisi data dan melihat hasil prediksi.
     
     📢 Catatan:
-    - Anda bisa mengunggah dataset sendiri (opsional).
+    - Dataset yang digunakan adalah dataset tetap yang telah disediakan.
     - Gunakan model Random Forest atau Logistic Regression untuk prediksi.
     """)
 
