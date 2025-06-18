@@ -7,8 +7,8 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, roc_curve, auc
 
 # Load Data
@@ -50,10 +50,42 @@ if 'y_test' not in st.session_state:
 
 # Sidebar Navigasi
 st.sidebar.title("Navigasi Aplikasi")
-page = st.sidebar.radio("Pilih Halaman", ["📘 Informasi", "📊 Pemodelan Data", "🔮 Prediksi", "👥 Anggota Kelompok"])
+page = st.sidebar.radio("Pilih Halaman", [
+    "🏠 Beranda",
+    "📘 Informasi Dataset",
+    "📊 Pemodelan Data",
+    "🔮 Prediksi",
+    "👥 Anggota Kelompok"
+])
+
+# ============================ BERANDA ============================
+if page == "🏠 Beranda":
+    st.title("🏠 Selamat Datang di Aplikasi Prediksi Kepribadian")
+    st.markdown("""
+    Aplikasi ini dirancang untuk memprediksi tipe kepribadian seseorang berdasarkan beberapa faktor psikologis dan sosial.
+
+    ### 📌 Fitur Utama:
+    - Menampilkan dataset dan visualisasi karakteristik data.
+    - Melatih dan mengevaluasi model machine learning.
+    - Memasukkan data baru dan memprediksi kepribadian.
+    - Informasi tim pengembang.
+
+    ### 🧭 Panduan Penggunaan:
+    1. Buka halaman **📘 Informasi Dataset** untuk memahami isi data dan visualisasinya.
+    2. Gunakan halaman **📊 Pemodelan Data** untuk memilih model dan melatihnya.
+    3. Setelah model dilatih, masuk ke halaman **🔮 Prediksi** untuk memasukkan data baru dan melihat prediksi.
+    4. Lihat halaman **👥 Anggota Kelompok** untuk informasi tim penyusun.
+
+    ### ⚠️ Catatan:
+    - Model harus dilatih terlebih dahulu sebelum bisa melakukan prediksi.
+    - Data yang dimasukkan harus sesuai dengan format yang digunakan di dataset.
+
+    ---
+    Aplikasi ini dikembangkan sebagai bagian dari proyek Tugas Akhir mata kuliah Data Mining.
+    """)
 
 # ============================ INFORMASI ============================
-if page == "📘 Informasi":
+elif page == "📘 Informasi Dataset":
     st.title("📘 Informasi Dataset Kepribadian")
     st.write("Dataset ini berisi informasi tentang kepribadian berdasarkan berbagai faktor psikologis.")
 
@@ -99,17 +131,17 @@ elif page == "📊 Pemodelan Data":
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     st.subheader("Pilih Model dan Parameter")
-    model_choice = st.selectbox("Model", ["Random Forest", "KNN", "Decision Tree"])
+    model_choice = st.selectbox("Model", ["Random Forest", "Decision Tree", "Logistic Regression"])
 
     if model_choice == "Random Forest":
         n_estimators = st.slider("Jumlah Pohon (n_estimators)", 10, 200, 100)
         model = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
-    elif model_choice == "KNN":
-        n_neighbors = st.slider("Jumlah Tetangga (n_neighbors)", 1, 20, 5)
-        model = KNeighborsClassifier(n_neighbors=n_neighbors)
     elif model_choice == "Decision Tree":
         max_depth = st.slider("Kedalaman Maksimum (max_depth)", 1, 20, 5)
         model = DecisionTreeClassifier(max_depth=max_depth, random_state=42)
+    elif model_choice == "Logistic Regression":
+        c_value = st.slider("Nilai C (Regulasi)", 0.01, 10.0, 1.0)
+        model = LogisticRegression(C=c_value, max_iter=1000, random_state=42)
 
     if st.button("🚀 Latih Model"):
         model.fit(X_train, y_train)
@@ -123,7 +155,8 @@ elif page == "📊 Pemodelan Data":
         st.session_state.X_test = X_test
         st.session_state.y_test = y_test
 
-        st.metric("Akurasi", f"{acc:.2f}")
+        st.success(f"✅ Model {model.__class__.__name__} telah dilatih!")
+        st.metric("🎯 Akurasi", f"{acc:.2f}")
 
         st.subheader("📋 Classification Report")
         st.dataframe(pd.DataFrame(report).transpose().style.format("{:.2f}"))
@@ -144,7 +177,7 @@ elif page == "📊 Pemodelan Data":
             sns.barplot(x='Pentingnya', y='Fitur', data=imp_df, palette='viridis', ax=ax_imp)
             st.pyplot(fig_imp)
 
-        if len(target_encoder.classes_) == 2:
+        if len(target_encoder.classes_) == 2 and hasattr(model, 'predict_proba'):
             st.subheader("🚦 ROC Curve")
             y_prob = model.predict_proba(X_test)[:, 1]
             fpr, tpr, _ = roc_curve(y_test, y_prob)
