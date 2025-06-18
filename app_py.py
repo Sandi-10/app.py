@@ -236,4 +236,3 @@ elif page == "👥 Anggota Kelompok":
 - 👨‍💻 Sandi Krisna Mukti (2304030074)  
 - 👩‍⚕️ Siti Maisyaroh (2304030079)
 """)
-kodenya ini
